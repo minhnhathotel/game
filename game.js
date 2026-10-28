@@ -1891,7 +1891,8 @@ async function downloadGame() {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
-    toast('⬇️ Đã tải game về máy: file vuon-tho-hong.html — mở file đó là chơi được, không cần mạng!', true);
+    toast('⬇️ Đã tải file vuon-tho-hong.html — mở file là chơi được, không cần mạng.', true);
+    toast('🖥️ Muốn có biểu tượng app trên máy thì bấm nút "Cài game thành app" ngay phía trên nhé!', true);
   } catch (e) {
     toast('Không tải được — hãy mở game từ trang web minhnhathotel.github.io/game rồi bấm tải lại nhé.', true);
   }
@@ -2102,23 +2103,30 @@ if (location.protocol === 'file:') {
 }
 $('#dlBtn').addEventListener('click', downloadGame);
 
-// Cài thành app (Chrome/Edge): chơi trong cửa sổ riêng, có biểu tượng trên máy, mất mạng vẫn chơi được
+// Cài thành app (Chrome/Edge/Cốc Cốc): chơi trong cửa sổ riêng, có biểu tượng trên máy, mất mạng vẫn chơi được.
+// Nút cài luôn hiện (trừ khi đang chơi trong app hoặc bằng file .html tải về); trình duyệt không tự bật
+// hộp cài thì hiện hướng dẫn cài bằng tay.
+const inApp = matchMedia('(display-mode: standalone)').matches;
+if (inApp || location.protocol === 'file:') $('#installBtn').hidden = true;
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js');
 let installPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   installPrompt = e;
-  $('#installBtn').hidden = false;
 });
 $('#installBtn').addEventListener('click', async () => {
-  if (!installPrompt) return;
+  if (!installPrompt) { $('#installHelp').hidden = false; return; }
   installPrompt.prompt();
   const { outcome } = await installPrompt.userChoice;
   installPrompt = null;
-  $('#installBtn').hidden = true;
   if (outcome === 'accepted') toast('🐰 Đã cài game thành app! Tìm biểu tượng Vườn Thỏ Hồng trên màn hình nền nhé.', true);
 });
-window.addEventListener('appinstalled', () => { $('#installBtn').hidden = true; });
+$('#closeInstall').addEventListener('click', () => { $('#installHelp').hidden = true; });
+$('#installHelp').addEventListener('click', (e) => { if (e.target.id === 'installHelp') $('#installHelp').hidden = true; });
+window.addEventListener('appinstalled', () => {
+  $('#installBtn').hidden = true;
+  toast('🐰 Đã cài game thành app! Tìm biểu tượng Vườn Thỏ Hồng trên màn hình nền nhé.', true);
+});
 layoutWorld();
 followBunny();
 setInterval(wolfFrame, 16);

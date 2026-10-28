@@ -44,8 +44,8 @@
       <span data-icon="fert"></span><b class="tab-n" id="fertN">0</b></button>
     <button class="tab" id="placeLand" aria-label="Đặt đất đã mua" hidden><span data-icon="land"></span></button>
     <hr>
-    <button class="tab" id="installBtn" aria-label="Cài game thành app trên máy" hidden><span data-icon="install"></span></button>
-    <button class="tab" id="dlBtn" aria-label="Tải game về máy (chơi không cần mạng)"><span data-icon="download"></span></button>
+    <button class="tab" id="installBtn" aria-label="Cài game thành app (có biểu tượng trên máy)"><span data-icon="install"></span></button>
+    <button class="tab" id="dlBtn" aria-label="Tải file game .html (chơi không cần mạng)"><span data-icon="download"></span></button>
   </nav>
   <div class="inv" id="inv"></div>
   <div id="speech"></div>
@@ -199,6 +199,21 @@
         Hãy bắt đầu lại và nhớ nấu thuốc chữa bệnh kịp thời nhé.</p>
       <button class="btn ghost" id="deathBook">📖 Xem sổ</button>
       <button class="btn" id="reviveBtn">🌱 Chơi lại từ đầu</button>
+    </div>
+  </div>
+
+  <div class="modal" id="installHelp" hidden>
+    <div class="modal-box">
+      <h3>🖥️ Cài game thành app</h3>
+      <p>Cài xong sẽ có biểu tượng <b>Vườn Thỏ Hồng</b> trên màn hình nền &amp; menu Start, mở như phần mềm, mất mạng vẫn chơi được.</p>
+      <ol class="install-steps">
+        <li><b>Chrome / Cốc Cốc:</b> bấm biểu tượng <b>cài đặt ⊕</b> (màn hình có mũi tên) ở cuối thanh địa chỉ —
+          hoặc menu <b>⋮</b> → <b>Truyền, lưu và chia sẻ</b> → <b>Cài đặt trang dưới dạng ứng dụng</b>.</li>
+        <li><b>Edge:</b> menu <b>⋯</b> → <b>Ứng dụng</b> → <b>Cài đặt trang web này dưới dạng ứng dụng</b>.</li>
+        <li>Bấm <b>Cài đặt</b>. Muốn ghim xuống thanh tác vụ: chuột phải vào biểu tượng app → <b>Ghim vào thanh tác vụ</b>.</li>
+      </ol>
+      <p class="hint">Không thấy mục cài? Bấm <b>Ctrl + F5</b> để tải lại trang rồi thử lại. Nếu đã cài rồi thì mở app từ menu Start.</p>
+      <button class="btn ghost" id="closeInstall">Đóng</button>
     </div>
   </div>
 

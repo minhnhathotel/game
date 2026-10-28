@@ -278,6 +278,9 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
 }
 .custom.med { margin-top: 14px; }
 #deathModal { z-index: 130; }
+#installHelp { z-index: 140; }
+.install-steps { padding-left: 20px; line-height: 1.5; }
+.install-steps li { margin-bottom: 6px; }
 .modal-box.death .btn.ghost { margin-right: 8px; }
 
 /* ---------- Sổ những lần ra đi: cuốn sổ bìa da mở 2 trang ---------- */
