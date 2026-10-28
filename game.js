@@ -1,5 +1,7 @@
 const $ = (s) => document.querySelector(s);
 const SAVE_KEY = 'vuon-tho-hong-v1';
+// sổ những lần ra đi lưu riêng khỏi bản lưu game nên chơi lại từ đầu vẫn còn
+const DEATH_KEY = 'vuon-tho-hong-so-tu';
 const DAY_MS = DAY_SECONDS * 1000;
 const WET_MS = 30000;          // một lần tưới giữ ẩm 30 giây
 const DRY_DIE_MS = 45000;      // hết ẩm mà để khô thêm 45 giây thì cây chết khô
@@ -85,6 +87,11 @@ function emptyPlot() {
 
 function load() {
   try {
+    // mở file game đã tải về lần đầu: dùng tiến trình được mang theo trong file (window.__SEED)
+    if (!localStorage.getItem(SAVE_KEY) && window.__SEED) {
+      if (window.__SEED.save) localStorage.setItem(SAVE_KEY, window.__SEED.save);
+      if (window.__SEED.deaths && !localStorage.getItem(DEATH_KEY)) localStorage.setItem(DEATH_KEY, window.__SEED.deaths);
+    }
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
     if (s && Array.isArray(s.plots)) {
       s.custom = s.custom || [];
@@ -139,7 +146,7 @@ function simulate(now, offline = false) {
       if (p.dryMs >= DRY_DIE_MS) {
         p.dead = true;
         p.bug = false;
-        toast(`🍂 Cây ${CROPS[p.crop].name} chết khô vì không được tưới kịp!`);
+        toast(`🍂 Cây ${CROPS[p.crop].name} chết khô vì không được tưới kịp!`, true);
         continue;
       }
     }
@@ -150,7 +157,7 @@ function simulate(now, offline = false) {
       // vừa mở lại game thì luôn còn ít nhất 10 giây để bắt
       if (offline) p.bugMs = Math.min(p.bugMs, PESTS[pest].eat - 10000);
       if (p.bugMs >= PESTS[pest].eat) {
-        toast(`${CATCH[pest].name} đã ăn trụi cây ${CROPS[p.crop].name}!`);
+        toast(`${CATCH[pest].name} đã ăn trụi cây ${CROPS[p.crop].name}!`, true);
         Object.assign(p, emptyPlot());
       }
       continue;
@@ -200,7 +207,7 @@ function burnFire(from, now, offline) {
   if (offline) {
     if (now - from >= OFFLINE_FIRE_MS && f.fuel > 0) {
       f.fuel = 0;
-      toast('🌑 Bạn đi vắng hơn 16 tiếng, lửa trại đã tắt… nhóm lửa lại ngay kẻo bị trộm!');
+      toast('🌑 Bạn đi vắng hơn 16 tiếng, lửa trại đã tắt… nhóm lửa lại ngay kẻo bị trộm!', true);
     }
     f.outMs = 0;
     return;
@@ -209,8 +216,8 @@ function burnFire(from, now, offline) {
   if (darkness(dayClock().f) <= 0) { f.outMs = 0; return; }
   const before = f.fuel;
   f.fuel = Math.max(0, f.fuel - (now - from) / FIRE_BURN_MS);
-  if (before >= FIRE_LOW && f.fuel < FIRE_LOW && f.fuel > 0) toast('🔥 Lửa trại sắp tắt! Thêm củi hoặc đốt nông sản đi.');
-  if (before > 0 && f.fuel <= 0) toast('🌑 Lửa trại đã tắt… kẻ trộm sắp mò tới!');
+  if (before >= FIRE_LOW && f.fuel < FIRE_LOW && f.fuel > 0) toast('🔥 Lửa trại sắp tắt! Thêm củi hoặc đốt nông sản đi.', true);
+  if (before > 0 && f.fuel <= 0) toast('🌑 Lửa trại đã tắt… kẻ trộm sắp mò tới!', true);
   if (f.fuel > 0) { f.outMs = 0; return; }
   // chỉ tính khoảng thời gian sau khi lửa tắt
   const outFrom = before > 0 ? from + before * FIRE_BURN_MS : from;
@@ -227,7 +234,7 @@ function steal() {
   const ripe = planted.filter((i) => state.plots[i].growth >= CROPS[state.plots[i].crop].days * DAY_MS);
   const pool = ripe.length ? ripe : planted;
   const i = pool[Math.floor(Math.random() * pool.length)];
-  toast(`🦝 Lửa tắt — kẻ trộm đã lấy mất cây ${CROPS[state.plots[i].crop].name}!`);
+  toast(`🦝 Lửa tắt — kẻ trộm đã lấy mất cây ${CROPS[state.plots[i].crop].name}!`, true);
   Object.assign(state.plots[i], emptyPlot());
   const tile = $('#garden') && $('#garden').children[i];
   if (tile) { tile.classList.remove('stolen'); void tile.offsetWidth; tile.classList.add('stolen'); }
@@ -284,16 +291,18 @@ function updateFireView() {
 }
 
 // ---------- Tiện ích ----------
-// lời thoại: đang ở ngoài bản đồ thì hiện trên đầu thỏ, đang mở bảng/cửa sổ thì hiện ở đáy màn hình
-function toast(msg) {
+// Thông báo: chuyện lặt vặt (đã tưới, có sâu, đã mua…) hiện ở khung nhỏ bên phải (#feed);
+// chuyện quan trọng (important = true: nguy hiểm, bệnh, sói, lửa sắp tắt…) thỏ nói trên đầu,
+// riêng lúc đang mở bảng/cửa sổ thì hiện ở đáy màn hình cho khỏi bị che
+function toast(msg, important = false) {
   const inPanel = ['#panel', '#seedModal', '#bookModal', '#deathModal'].some((s) => !$(s).hidden);
-  const box = inPanel ? $('#toasts') : $('#speech');
+  const box = !important ? $('#feed') : inPanel ? $('#toasts') : $('#speech');
   const el = document.createElement('div');
-  el.className = 'toast';
+  el.className = important ? 'toast' : 'note';
   el.textContent = msg;
   box.appendChild(el);
-  while (box.children.length > 4) box.firstChild.remove();
-  setTimeout(() => el.remove(), 2600);
+  while (box.children.length > (important ? 4 : 6)) box.firstChild.remove();
+  setTimeout(() => el.remove(), important ? 2600 : 4000);
 }
 // lời thoại bám theo đầu thỏ
 function followBunny() {
@@ -304,7 +313,7 @@ function followBunny() {
 }
 function useEnergy(n) {
   if (state.energy < n) {
-    toast('😴 Thỏ mệt rồi! Vào Kho cho thỏ ăn món đã nấu nhé.');
+    toast('😴 Thỏ mệt rồi! Vào Kho cho thỏ ăn món đã nấu nhé.', true);
     return false;
   }
   state.energy -= n;
@@ -317,7 +326,7 @@ function addXp(n) {
     state.xp -= xpNeed(state.level);
     state.level++;
     const unlocked = Object.values(CROPS).filter((c) => c.level === state.level).map((c) => c.icon + ' ' + c.name);
-    toast(`🎉 Lên cấp ${state.level}!` + (unlocked.length ? ' Mở khóa: ' + unlocked.join(', ') : ''));
+    toast(`🎉 Lên cấp ${state.level}!` + (unlocked.length ? ' Mở khóa: ' + unlocked.join(', ') : ''), true);
   }
 }
 const count = (bag, id) => bag[id] || 0;
@@ -386,11 +395,11 @@ function fmtTime(ms) {
 function getSick(kind, msg, cause) {
   if (state.ills[kind]) {
     state.ills[kind].cause = cause;
-    toast(msg);
+    toast(msg, true);
     return worsen(kind);
   }
   state.ills[kind] = { sev: 1, left: ILL_MS, cause };
-  toast(`${msg} Vào Bếp nấu ${MEDICINES[ILLNESSES[kind].cure].name} trong ${fmtTime(ILL_MS)}!`);
+  toast(`${msg} Vào Bếp nấu ${MEDICINES[ILLNESSES[kind].cure].name} trong ${fmtTime(ILL_MS)}!`, true);
 }
 function worsen(kind) {
   const ill = state.ills[kind];
@@ -398,7 +407,7 @@ function worsen(kind) {
   ill.sev++;
   ill.left = Math.round(ill.left / 2);
   if (ill.sev > ILL_MAX) return die(`${ILLNESSES[kind].icon} ${ILLNESSES[kind].name} trở nặng quá mức.`, kind);
-  toast(`⚠️ ${ILLNESSES[kind].name} nặng thêm (cấp ${ill.sev}/${ILL_MAX})! Chỉ còn ${fmtTime(ill.left)} để chữa.`);
+  toast(`⚠️ ${ILLNESSES[kind].name} nặng thêm (cấp ${ill.sev}/${ILL_MAX})! Chỉ còn ${fmtTime(ill.left)} để chữa.`, true);
 }
 function die(reason, kind) {
   if (state.dead) return;
@@ -419,8 +428,6 @@ function showDeath() {
 }
 
 // ---------- Sổ những lần ra đi ----------
-// lưu riêng khỏi bản lưu game nên chơi lại từ đầu vẫn còn
-const DEATH_KEY = 'vuon-tho-hong-so-tu';
 const CAUSES = {
   snake:   'Bị rắn cắn khi chặt cây',
   sting:   'Bị côn trùng đốt khi bắt sâu',
@@ -554,9 +561,9 @@ function cookMedicine() {
   if (kind) {
     delete state.ills[kind];
     state.energy = Math.min(MAX_ENERGY, state.energy + 10);
-    toast(`💊 Uống ${MEDICINES[mid].name} — khỏi ${ILLNESSES[kind].name} rồi!`);
+    toast(`💊 Uống ${MEDICINES[mid].name} — khỏi ${ILLNESSES[kind].name} rồi!`, true);
   } else {
-    toast(mid ? `😵 ${MEDICINES[mid].name} không đúng bệnh! Thỏ mệt thêm…` : '😵 Nấu sai thuốc! Thỏ uống vào bệnh nặng thêm…');
+    toast(mid ? `😵 ${MEDICINES[mid].name} không đúng bệnh! Thỏ mệt thêm…` : '😵 Nấu sai thuốc! Thỏ uống vào bệnh nặng thêm…', true);
     kinds.forEach(worsen);
   }
   renderAll();
@@ -618,7 +625,12 @@ function updateIllView() {
 }
 
 // Toạ độ (x, y) của bunny là điểm giữa-trên của nó trên bản đồ #world
+// trả về số mili giây thỏ cần để tới nơi; đi chỗ khác thì huỷ việc đang chờ làm ở chỗ cũ
+let pendingAct = null;
 function moveBunny(x, y) {
+  clearTimeout(pendingAct);
+  pendingAct = null;
+  if (chasing) stopChase();   // đi chỗ khác thì thôi đuổi sói
   const bunny = $('#bunny');
   // đi xa thì lâu hơn & nhảy nhiều bước hơn (mỗi bước 0,45 giây)
   const secs = Math.min(1.8, Math.max(0.45, Math.hypot(x - bunny.offsetLeft, y - bunny.offsetTop) / 360));
@@ -630,6 +642,14 @@ function moveBunny(x, y) {
   bunny.classList.remove('hop');
   void bunny.offsetWidth;
   bunny.classList.add('hop');
+  return secs * 1000;
+}
+// thỏ tới nơi rồi mới làm việc (hái, chặt, mở nhà, đánh sói…)
+function whenArrived(ms, fn) {
+  pendingAct = setTimeout(() => {
+    pendingAct = null;
+    if (!state.dead) fn();
+  }, ms);
 }
 // toạ độ trong khung #stage (đơn vị chưa phóng to/thu nhỏ)
 function rectInWorld(el) {
@@ -666,15 +686,15 @@ function layoutWorld() {
 }
 function hopTo(i) {
   const tile = $('#garden').children[i];
-  if (!tile) return;
+  if (!tile) return 0;
   lastHop = i;
   const r = rectInWorld(tile);
-  moveBunny(r.x + r.w * 0.85, r.y + r.h - $('#bunny').offsetHeight * 0.85);
+  return moveBunny(r.x + r.w * 0.85, r.y + r.h - $('#bunny').offsetHeight * 0.85);
 }
 function walkToBuilding(el) {
   lastHop = null;
   const r = rectInWorld(el);
-  moveBunny(r.x + r.w / 2, r.y + r.h - $('#bunny').offsetHeight + 8);
+  return moveBunny(r.x + r.w / 2, r.y + r.h - $('#bunny').offsetHeight + 8);
 }
 
 // ---------- Các ngôi nhà ----------
@@ -691,8 +711,10 @@ function closePanel() { $('#panel').hidden = true; }
 
 // ---------- Vườn ----------
 function plotClick(i) {
+  whenArrived(hopTo(i), () => plotAction(i));
+}
+function plotAction(i) {
   const p = state.plots[i];
-  hopTo(i);
   if (!p.crop) return openSeedPicker(i);
   if (p.dead) return clearDead(i);
   if (p.bug) return catchBug(i);
@@ -751,13 +773,13 @@ function chopTree(el) {
     : '🌳 Cây đổ, +2 🪵 củi. Một lúc sau cây sẽ mọc lại…');
   if (--state.axe.left <= 0) {
     state.axe = null;
-    toast('💥 Rắc! Rìu gãy rồi — mua rìu mới ở Cửa hàng nhé.');
+    toast('💥 Rắc! Rìu gãy rồi — mua rìu mới ở Cửa hàng nhé.', true);
   }
   renderAll();
 }
 function walkToTree(el) {
   lastHop = null;
-  moveBunny(el.offsetLeft + el.offsetWidth / 2, el.offsetTop + el.offsetHeight - $('#bunny').offsetHeight);
+  return moveBunny(el.offsetLeft + el.offsetWidth / 2, el.offsetTop + el.offsetHeight - $('#bunny').offsetHeight);
 }
 
 // vẽ lại cây theo trạng thái (đứng / gốc / mất hẳn); trả về true nếu có cây đổi trạng thái
@@ -835,11 +857,14 @@ function castLine() {
   if (!count(state.produce, bait)) return toast('Hết mồi rồi — bắt sâu, côn trùng trên ruộng để làm mồi.');
   if (!useEnergy(COST.fish)) return;
   take(state.produce, bait, 1);
-  fishing = { bait, end: Date.now() + 2500 + Math.random() * 3500 };
   const dock = $('#b-pond');
   lastHop = null;
-  moveBunny(dock.offsetLeft + dock.offsetWidth - 34, dock.offsetTop + 34 - $('#bunny').offsetHeight);
-  toast(`🎣 Mắc ${CATCH[bait].name.toLowerCase()} rồi thả câu…`);
+  const walk = moveBunny(dock.offsetLeft + dock.offsetWidth - 34, dock.offsetTop + 34 - $('#bunny').offsetHeight);
+  // tính giờ chờ cá cắn từ lúc thỏ ra tới cuối cầu
+  fishing = { bait, end: Date.now() + walk + 2500 + Math.random() * 3500 };
+  // đóng bảng để xem thỏ ngồi câu; kết quả sẽ hiện trên đầu thỏ
+  closePanel();
+  toast(`🎣 Mắc ${CATCH[bait].name.toLowerCase()} rồi thả câu…`, true);
   renderAll();
 }
 function reelIn() {
@@ -851,13 +876,13 @@ function reelIn() {
     give(state.produce, fish, 1);
     addXp(CATCH[fish].xp);
     snap = CATCH[fish].snap;
-    toast(`🐟 Câu được 1 ${CATCH[fish].name}!`);
+    toast(`🐟 Câu được 1 ${CATCH[fish].name}!`, true);
   } else {
-    toast('💨 Cá rỉa mất mồi rồi chạy mất…');
+    toast('💨 Hụt rồi! Cá rỉa mất mồi chạy mất…', true);
   }
   if (Math.random() < snap) {
     state.rod = null;
-    toast('💥 Cá giật mạnh quá — cần câu gãy rồi! Mua cần mới ở Cửa hàng.');
+    toast('💥 Cá giật mạnh quá — cần câu gãy rồi! Mua cần mới ở Cửa hàng.', true);
   }
   renderAll();
 }
@@ -1030,7 +1055,7 @@ function harvest(i, verbose) {
   if (!useEnergy(COST.harvest)) return false;
   give(state.produce, p.mut ? p.crop + '_db' : p.crop, c.yield);
   addXp(c.xp);
-  if (p.mut) toast(`🧬 Thu hoạch ${c.yield} ${c.name} ĐỘT BIẾN — phát sáng kỳ lạ…`);
+  if (p.mut) toast(`🧬 Thu hoạch ${c.yield} ${c.name} ĐỘT BIẾN — phát sáng kỳ lạ…`, true);
   else if (verbose) toast(`✨ Thu hoạch ${c.yield} ${c.icon} ${c.name}`);
   Object.assign(p, emptyPlot());
   renderAll();
@@ -1098,13 +1123,13 @@ const isMutant = (ingr) => Object.keys(ingr).some((id) => MUTANTS[id]);
 function mutateBunny() {
   const kind = randOf(Object.keys(MORPHS));
   state.morph = { kind, hue: Math.floor(Math.random() * 360), until: Date.now() + MORPH_MS };
-  toast(`${MORPHS[kind]} (${MORPH_MS / 1000} giây)`);
+  toast(`${MORPHS[kind]} (${MORPH_MS / 1000} giây)`, true);
   updateMorph();
 }
 function updateMorph() {
   if (state.morph && Date.now() >= state.morph.until) {
     state.morph = null;
-    toast('✨ Thỏ trở lại bình thường rồi.');
+    toast('✨ Thỏ trở lại bình thường rồi.', true);
   }
   const m = state.morph;
   ['#avatar', '#bunny', '#chef'].forEach((s) => {
@@ -1682,7 +1707,7 @@ function renderNight() {
   b.classList.toggle('torch', torch);
   if (renderNight.torch !== undefined && renderNight.torch !== torch) {
     toast(torch ? '🌒 Trời tối rồi! Thỏ thắp đuốc — nhớ giữ lửa trại cháy kẻo trộm mò tới.'
-      : '🌅 Trời sáng rồi! Ban ngày lửa trại được ủ, không cần thêm củi.');
+      : '🌅 Trời sáng rồi! Ban ngày lửa trại được ủ, không cần thêm củi.', true);
   }
   renderNight.torch = torch;
   if (dark <= 0) return;
@@ -1693,10 +1718,183 @@ function renderNight() {
     [470, 130, 75],                                 // cửa sổ nhà bếp
     [b.offsetLeft, b.offsetTop + 34, 170],         // đuốc thỏ đang cầm
   ].filter(([, , r]) => r > 0);
+  renderNight.lights = lights;
   const mask = lights.map(([x, y, r]) =>
     `radial-gradient(circle at ${(x + stageOX).toFixed(0)}px ${(y + stageOY).toFixed(0)}px, transparent ${(r * 0.5).toFixed(0)}px, #000 ${r.toFixed(0)}px)`).join(',');
   night.style.webkitMaskImage = mask;
   night.style.maskImage = mask;
+}
+
+// ---------- Sói đêm ----------
+// Ban đêm thỉnh thoảng (mỗi đêm tối đa 1 con) có sói từ bìa rừng mò tới nhà kho trộm đồ rồi tha vào rừng.
+// Bấm vào sói đủ 3 lần: chưa kịp trộm thì sói sợ bỏ chạy, đã trộm thì làm rơi lại đồ.
+const WOLF_DEN = [-150, 200];         // chỗ sói ra/vào rừng (toạ độ bản đồ)
+const WOLF_STORE = [178, 304];        // trước cửa nhà kho
+const WOLF_HITS = 3, WOLF_LOOT = 3;
+const WOLF_SPEED = 80, WOLF_FLEE = 110, WOLF_STEAL_MS = 2500;
+const WOLF_STUN_MS = 700;             // bị đánh thì sói khựng lại một chút
+const WOLF_RATE = 0.006;              // mỗi nhịp 0,25 giây lúc tối hẳn: trung bình ~40 giây sói xuất hiện
+let wolf = null, wolfNight = 0, lastWolfFrame = 0;
+
+const lootText = (loot) => Object.entries(loot).map(([id, n]) => `${n} ${GOODS[id].name.toLowerCase()}`).join(', ');
+function spawnWolf() {
+  wolf = { x: WOLF_DEN[0], y: WOLF_DEN[1], dir: 1, phase: 'come', hits: 0, loot: {}, bad: {}, t: 0 };
+  $('#wolf').hidden = false;
+  toast('🐺 Có tiếng sói hú ở bìa rừng… cầm đuốc đi tuần quanh nhà kho thôi!', true);
+}
+function wolfSteal() {
+  const ids = Object.keys(state.produce);
+  for (let k = 0; k < WOLF_LOOT && ids.length; k++) {
+    const id = randOf(ids);
+    // giữ nguyên số đồ độc (nấm độc) để lỡ lấy lại được thì vẫn đúng
+    wolf.bad[id] = (wolf.bad[id] || 0) + take(state.produce, id, 1);
+    give(wolf.loot, id, 1);
+    if (!count(state.produce, id)) ids.splice(ids.indexOf(id), 1);
+  }
+  const names = lootText(wolf.loot);
+  toast(names ? `🐺 Sói đã trộm ${names} trong kho!` : '🐺 Sói lục kho mà chẳng có gì, bỏ đi…', true);
+  renderAll();
+}
+// bấm vào sói: thỏ đuổi bám theo sói (chạy nhanh hơn sói), bắt kịp thì đánh 1 cú
+let chasing = false;
+const CHASE_SPEED = 380;
+function chaseWolf() {
+  if (!wolf || wolf.hits >= WOLF_HITS) return;
+  clearTimeout(pendingAct);
+  pendingAct = null;
+  lastHop = null;
+  chasing = true;
+  $('#bunny').classList.add('run');
+}
+function stopChase() {
+  chasing = false;
+  $('#bunny').classList.remove('run');
+}
+// gọi mỗi khung hình sau khi sói di chuyển
+function chaseStep(dt) {
+  const b = $('#bunny');
+  const bx = b.offsetLeft, by = b.offsetTop + b.offsetHeight;          // chân thỏ
+  const tx = wolf.x - wolf.dir * 28, ty = wolf.y;                       // đứng cạnh sói
+  const dx = tx - bx, dy = ty - by, d = Math.hypot(dx, dy);
+  if (d < 18) {
+    stopChase();
+    hitWolf();
+    return;
+  }
+  const step = Math.min(d, (CHASE_SPEED * dt) / 1000);
+  b.style.transitionDuration = '0s';
+  b.classList.toggle('flip', dx < 0);
+  b.style.left = bx + (dx / d) * step + 'px';
+  b.style.top = by + (dy / d) * step - b.offsetHeight + 'px';
+}
+function hitWolf() {
+  if (!wolf || wolf.hits >= WOLF_HITS) return;
+  wolf.hits++;
+  wolf.stun = WOLF_STUN_MS;
+  const el = $('#wolf');
+  el.classList.remove('hurt'); void el.offsetWidth; el.classList.add('hurt');
+  if (wolf.hits < WOLF_HITS) return toast(`🐰 Đánh nè! (${wolf.hits}/${WOLF_HITS})`, true);
+  const names = lootText(wolf.loot);
+  for (const [id, n] of Object.entries(wolf.loot)) give(state.produce, id, n, wolf.bad[id] || 0);
+  wolf.loot = {};
+  wolf.bad = {};
+  wolf.phase = 'flee';
+  addXp(5);
+  toast(names ? `🐺 Ẳng! Sói đau quá làm rơi lại ${names}!` : '🐺 Ẳng! Sói hoảng sợ cụp đuôi bỏ chạy!', true);
+  renderAll();
+}
+// sói (và thỏ lúc đuổi sói) di chuyển mượt ~60 lần mỗi giây
+function wolfFrame() {
+  const ts = performance.now();
+  const dt = lastWolfFrame ? Math.min(100, ts - lastWolfFrame) : 0;
+  lastWolfFrame = ts;
+  if (wolf && !state.dead) stepWolf(dt);
+}
+function stepWolf(dt) {
+  const el = $('#wolf');
+  if (wolf.stun > 0) {
+    wolf.stun -= dt;                    // đang choáng: đứng yên, không trộm tiếp
+  } else if (wolf.phase === 'steal') {
+    wolf.t -= dt;
+    if (wolf.t <= 0) { wolfSteal(); wolf.phase = 'flee'; }
+  } else {
+    const [tx, ty] = wolf.phase === 'come' ? WOLF_STORE : WOLF_DEN;
+    const dx = tx - wolf.x, dy = ty - wolf.y, d = Math.hypot(dx, dy);
+    const step = ((wolf.phase === 'come' ? WOLF_SPEED : WOLF_FLEE) * dt) / 1000;
+    if (d <= step) {
+      wolf.x = tx;
+      wolf.y = ty;
+      if (wolf.phase === 'come') {
+        wolf.phase = 'steal';
+        wolf.t = WOLF_STEAL_MS;
+      } else {
+        const names = lootText(wolf.loot);
+        if (names) toast(`🐺 Sói đã tha mất ${names} vào rừng…`, true);
+        wolf = null;
+        el.hidden = true;
+        stopChase();
+        return;
+      }
+    } else {
+      wolf.x += (dx / d) * step;
+      wolf.y += (dy / d) * step;
+      if (Math.abs(dx) > 1) wolf.dir = dx < 0 ? -1 : 1;
+    }
+  }
+  el.classList.toggle('walk', wolf.phase !== 'steal');
+  el.classList.toggle('left', wolf.dir < 0);
+  el.style.left = wolf.x + stageOX + 'px';
+  el.style.top = wolf.y + stageOY + 'px';
+  if (chasing) chaseStep(dt);
+  if (!wolf) return;
+  // trong bóng tối chỉ thấy đôi mắt; đứng trong vùng sáng mới thấy rõ cả con
+  const dark = darkness(dayClock().f);
+  const lit = (renderNight.lights || []).some(([x, y, r]) => Math.hypot(x - wolf.x, y - wolf.y) < r * 0.8);
+  el.style.setProperty('--dim', (1 - dark * (lit ? 0.1 : 0.85)).toFixed(2));
+  el.style.setProperty('--glow', lit ? 0 : dark.toFixed(2));
+}
+// gọi mỗi nhịp: lúc tối hẳn thì thỉnh thoảng có sói; trời sáng thì sói bỏ chạy
+function wolfTick() {
+  const { n, f } = dayClock(), dark = darkness(f);
+  if (!wolf && dark >= 0.9 && wolfNight !== n && Math.random() < WOLF_RATE) {
+    wolfNight = n;
+    spawnWolf();
+  }
+  if (wolf && dark === 0 && wolf.phase !== 'flee') wolf.phase = 'flee';
+}
+
+// ---------- Tải game về máy ----------
+// gom index.html + style.css + các file js thành 1 file .html duy nhất (kèm tiến trình đang chơi)
+// để mở bằng trình duyệt là chơi được, không cần mạng
+const GAME_SCRIPTS = ['data.js', 'scene.js', 'crops.js', 'game.js'];
+async function downloadGame() {
+  try {
+    const get = async (f) => {
+      const r = await fetch(f, { cache: 'no-cache' });
+      if (!r.ok) throw new Error(f);
+      return r.text();
+    };
+    const [page, css, ...js] = await Promise.all([get('index.html'), get('style.css'), ...GAME_SCRIPTS.map(get)]);
+    save();
+    const seed = JSON.stringify({ save: localStorage.getItem(SAVE_KEY), deaths: localStorage.getItem(DEATH_KEY) });
+    // dùng hàm thay thế để các ký tự $ trong code không bị hiểu nhầm
+    let html = page.replace('<link rel="stylesheet" href="style.css">', () => `<style>\n${css}\n</style>`);
+    GAME_SCRIPTS.forEach((f, i) => {
+      html = html.replace(`<script src="${f}"></script>`, () => (i === 0 ? `<script>window.__SEED = ${seed.replace(/</g, '\\u003c')};</script>\n` : '')
+        + `<script>\n${js[i].replace(/<\/script/gi, '<\\/script')}\n</script>`);
+    });
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'vuon-tho-hong.html';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    toast('⬇️ Đã tải game về máy: file vuon-tho-hong.html — mở file đó là chơi được, không cần mạng!', true);
+  } catch (e) {
+    toast('Không tải được — hãy mở game từ trang web minhnhathotel.github.io/game rồi bấm tải lại nhé.', true);
+  }
 }
 
 // ---------- Túi đồ ở đáy màn hình ----------
@@ -1759,6 +1957,7 @@ function tick() {
   if (renderTrees()) renderPlacer();   // cây mọc lại thì chỗ đặt đất thay đổi
   if (fishing && Date.now() >= fishing.end) reelIn();
   renderNight();
+  wolfTick();
   renderWild();
   if (state.morph) updateMorph();
   renderGarden();
@@ -1775,8 +1974,7 @@ function tick() {
 
 // ---------- Sự kiện ----------
 document.querySelectorAll('.building').forEach((b) => b.addEventListener('click', () => {
-  walkToBuilding(b);
-  setTimeout(() => openPanel(b.dataset.open), 480);
+  whenArrived(walkToBuilding(b), () => openPanel(b.dataset.open));
 }));
 $('#closePanel').addEventListener('click', closePanel);
 $('#panel').addEventListener('click', (e) => { if (e.target.id === 'panel') closePanel(); });
@@ -1790,15 +1988,14 @@ $('#wild').addEventListener('click', (e) => {
   const el = e.target.closest('[data-wild]');
   if (!el) return;
   lastHop = null;
-  moveBunny(el.offsetLeft + 15, el.offsetTop + 26 - $('#bunny').offsetHeight);
-  pickWild(+el.dataset.wild);
+  const i = +el.dataset.wild;
+  whenArrived(moveBunny(el.offsetLeft + 15, el.offsetTop + 26 - $('#bunny').offsetHeight), () => pickWild(i));
 });
 // bấm vào cây trên bản đồ để chặt
 $('#decor').addEventListener('click', (e) => {
   const el = e.target.closest('[data-tree]');
   if (!el) return;
-  walkToTree(el);
-  chopTree(el);
+  whenArrived(walkToTree(el), () => chopTree(el));
 });
 $('#placeLand').addEventListener('click', () => (placing ? stopPlacing() : startPlacing()));
 // bấm xuống đất trống thì thỏ chạy tới chỗ đó
@@ -1862,6 +2059,8 @@ function resetGame() {
   medPot = {};
   placing = false;
   fishing = null;
+  wolf = null;
+  $('#wolf').hidden = true;
   renderWeeds.prev = null;
   $('#garden').innerHTML = '';
   $('#deathModal').hidden = true;
@@ -1894,8 +2093,35 @@ window.addEventListener('beforeunload', save);
 renderScene();
 document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = uiIcon(el.dataset.icon); });
 $('#clock').innerHTML = clockSVG();
+$('#wolf .wolf-body').innerHTML = wolfSVG();
+$('#wolf').addEventListener('click', chaseWolf);
+// đang chơi bằng file đã tải về rồi thì ẩn nút tải
+if (location.protocol === 'file:') {
+  $('#dlBtn').hidden = true;
+  $('#dlBtn').previousElementSibling.previousElementSibling.hidden = true;   // đường kẻ ngăn cách phía trên
+}
+$('#dlBtn').addEventListener('click', downloadGame);
+
+// Cài thành app (Chrome/Edge): chơi trong cửa sổ riêng, có biểu tượng trên máy, mất mạng vẫn chơi được
+if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js');
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  $('#installBtn').hidden = false;
+});
+$('#installBtn').addEventListener('click', async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  const { outcome } = await installPrompt.userChoice;
+  installPrompt = null;
+  $('#installBtn').hidden = true;
+  if (outcome === 'accepted') toast('🐰 Đã cài game thành app! Tìm biểu tượng Vườn Thỏ Hồng trên màn hình nền nhé.', true);
+});
+window.addEventListener('appinstalled', () => { $('#installBtn').hidden = true; });
 layoutWorld();
 followBunny();
+setInterval(wolfFrame, 16);
 $('#avatar').innerHTML = bunnySVG(false);
 $('#bunny').innerHTML = bunnySVG(false) + `<span class="hand-torch">${torchSVG()}</span>`;
 $('#chef').innerHTML = bunnySVG(true);

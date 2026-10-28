@@ -134,6 +134,27 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
   transform: translate(-50%, calc(-100% - 4px));
 }
 
+/* sói đêm: nằm trên lớp bóng tối, thân tự tối đi (--dim do game.js đặt) trừ khi đứng trong vùng sáng;
+   mắt luôn phát sáng nên nhìn thấy trong đêm */
+.wolf {
+  position: absolute; z-index: 96; width: 74px; height: 120px; padding: 0; border: none; background: none;
+  cursor: pointer; transform: translate(-50%, -100%);
+}
+.wolf[hidden] { display: none; }
+.wolf-body { display: block; width: 100%; height: 100%; }
+.wolf-body svg { display: block; width: 100%; height: 100%; overflow: visible; filter: url(#sketch) brightness(var(--dim, 1)); }
+.wolf.left .wolf-body svg { transform: scaleX(-1); }
+.wolf.walk .wolf-body { animation: trot .3s ease-in-out infinite alternate; }
+@keyframes trot { to { translate: 0 -3px; } }
+/* mắt phát sáng: chỉ hiện khi trời tối (--glow do game.js đặt theo độ tối) */
+.wolf-eye {
+  position: absolute; left: 72%; top: 20.5%; width: 5px; height: 4px; border-radius: 50%;
+  background: #ffe14a; box-shadow: 0 0 6px 3px rgba(255,220,80,.85); opacity: var(--glow, 0);
+}
+.wolf.left .wolf-eye { left: 22%; }
+.wolf.hurt .wolf-body { animation: hurt .35s ease; }
+@keyframes hurt { 25% { translate: -5px 0; filter: brightness(1.6) sepia(1) hue-rotate(-30deg) saturate(4); } 75% { translate: 5px 0; } }
+
 /* đêm tối: chỉ sáng quanh lửa trại, đuốc, cửa sổ bếp & quanh thỏ (vị trí đèn do game.js đặt) */
 .night {
   position: absolute; inset: 0; z-index: 94; pointer-events: none; opacity: 0;
@@ -601,6 +622,19 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
   animation: toast 2.6s forwards;
 }
 @keyframes toast { 0% { opacity: 0; translate: 0 10px; } 10%,80% { opacity: 1; translate: 0 0; } 100% { opacity: 0; } }
+/* khung thông báo lặt vặt bên phải, dưới các đồng hồ */
+#feed {
+  position: fixed; top: 100px; right: 12px; z-index: 120; width: min(280px, 60vw); pointer-events: none;
+  display: flex; flex-direction: column; gap: 4px; align-items: flex-end;
+}
+.note {
+  max-width: 100%; padding: 4px 10px; font-size: .92rem; line-height: 1.25; color: #f4efe4;
+  background: var(--grain), rgba(43,33,24,.9); border: 2px solid var(--ink); border-radius: 8px 4px 9px 5px;
+  box-shadow: 2px 3px 0 rgba(0,0,0,.45); animation: note 4s forwards;
+}
+@keyframes note { 0% { opacity: 0; translate: 14px 0; } 8%, 85% { opacity: 1; translate: 0 0; } 100% { opacity: 0; } }
+/* thỏ đang đuổi sói: nhảy liên tục */
+.bunny.run svg { animation: hop .3s ease infinite; }
 
 @media (max-width: 600px) {
   .modal-box.wide { padding: 0 14px 14px; }
@@ -612,6 +646,7 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
   .meter.level b { font-size: 1.2rem; }
   .hud-tr { gap: 4px; right: 6px; }
   .hud-tl { top: 70px; left: 6px; }
+  #feed { top: 130px; right: 6px; }
   .portrait { width: 50px; height: 50px; }
   .coins { font-size: 1rem; }
   .coins .coin-ico { width: 24px; height: 24px; }

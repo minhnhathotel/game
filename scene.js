@@ -221,6 +221,10 @@ function uiIcon(name) {
     axe: `<path d="M12 36 L26 8" ${o(4.5)}/><path d="M12 36 L26 8" stroke="#8a6a45" stroke-width="2.2"/><path d="M22 6 Q35 6 36 19 L26 16 Z" fill="#9c988f" ${o(2)}/>`,
     rod: `<path d="M6 36 L30 4" ${o(4)}/><path d="M6 36 L30 4" stroke="#b08a5a" stroke-width="2"/><path d="M30 4 Q37 16 34 28" stroke="${K}" stroke-width="1.2" fill="none"/>
       <circle cx="34" cy="30" r="3" fill="#c94a3a" ${o(1.4)}/><circle cx="12" cy="28" r="3.5" fill="#6b675f" ${o(1.5)}/>`,
+    install: `<rect x="5" y="7" width="30" height="21" rx="2" fill="#4f6f78" ${o(2.4)}/><path d="M14 34 H26 M20 28 V34" ${o(2.6)}/>
+      <path d="M20 10 V22 M15 17 L20 22 L25 17" fill="none" stroke="#efe8da" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`,
+    download: `<path d="M16 4 H24 V17 H30 L20 28 L10 17 H16 Z" fill="#7fa04a" ${o(2.2)}/>
+      <path d="M6 26 V34 H34 V26" fill="none" ${o(3.2)}/>`,
     coin: `<circle cx="20" cy="20" r="14" fill="#d9b84a" ${o()}/><circle cx="20" cy="20" r="9" fill="none" stroke="#a8862a" stroke-width="2"/>
       <path d="M16 16 H24 M20 16 V26" stroke="#a8862a" stroke-width="2.6" stroke-linecap="round"/>`,
   }[name] || '';
@@ -287,6 +291,38 @@ function wildShroomSVG(v = 0) {
   return `<svg viewBox="0 0 40 34">
     <ellipse cx="20" cy="31" rx="16" ry="3" fill="rgba(20,15,10,.3)"/>
     ${one(13, 18, 8, 12)}${one(27, 22, 6, 8)}${v % 2 ? one(21, 26, 4, 5) : ''}
+  </svg>`;
+}
+
+// sói xám đứng thẳng hai chân, cao lêu nghêu, mõm dài, mí mắt sụp ngái ngủ, tay khoanh sau lưng,
+// đuôi dài xù chấm đất; nhìn sang phải (mắt phát sáng trong đêm vẽ riêng bằng .wolf-eye)
+function wolfSVG() {
+  const G = '#8d8f8c', G2 = '#74766f';
+  const legs = 'M39 94 L35 121 M48 94 L51 121';
+  const arm = 'M41 50 C31 58 29 70 37 79';
+  return `<svg viewBox="0 0 80 130">
+    <ellipse cx="42" cy="126" rx="32" ry="4" fill="rgba(0,0,0,.35)"/>
+    <path d="M35 86 C20 90 8 104 3 121 C13 117 21 112 28 104 C25 112 26 119 24 125 C33 117 38 105 41 96 Z" fill="${G}" ${ink(2.5)}/>
+    <path d="M14 110 l5 -4 M20 116 l4 -5" stroke="${G2}" stroke-width="1.6"/>
+    <path d="${legs}" stroke="${K}" stroke-width="7.5" stroke-linecap="round"/>
+    <path d="${legs}" stroke="${G}" stroke-width="3.8" stroke-linecap="round"/>
+    <ellipse cx="38" cy="123" rx="7.5" ry="3.2" fill="#56584f" ${ink(1.8)}/>
+    <ellipse cx="55" cy="123" rx="7.5" ry="3.2" fill="#56584f" ${ink(1.8)}/>
+    <path d="M42 37 C55 41 59 60 57 78 C56 90 52 98 45 100 C35 101 30 92 31 80 C32 64 32 45 42 37 Z" fill="${G}" ${ink(3)}/>
+    <path d="M49 52 C55 62 55 80 49 94 C45 82 45 64 49 52 Z" fill="#b8b8b0"/>
+    <path d="${arm}" fill="none" stroke="${K}" stroke-width="7" stroke-linecap="round"/>
+    <path d="${arm}" fill="none" stroke="${G2}" stroke-width="3.6" stroke-linecap="round"/>
+    <path d="M40 34 C40 22 48 16 56 18 L74 33 C79 36 79 42 74 43 L58 42 C48 44 40 42 40 34 Z" fill="${G}" ${ink(3)}/>
+    <path d="M44 23 L41 2 L52 18 Z" fill="${G}" ${ink(2.5)}/>
+    <path d="M51 19 L57 3 L61 22 Z" fill="${G2}" ${ink(2.5)}/>
+    <path d="M45 18 L43 8 M54 17 L57 9" stroke="#b8b8b0" stroke-width="1.6"/>
+    <ellipse cx="75.5" cy="38" rx="3.6" ry="3" fill="${K}"/>
+    <path d="M60 41.5 Q67 43.5 73 41.5" stroke="${K}" stroke-width="1.6" fill="none"/>
+    <ellipse cx="59" cy="28.5" rx="4.6" ry="3" fill="#efe8da" ${ink(1.4)}/>
+    <circle cx="60.6" cy="29.6" r="1.4" fill="${K}"/>
+    <path d="M54 27.5 Q59 23.5 64 27.5 L64 26 Q59 21 54 26 Z" fill="${G2}" ${ink(1.6)}/>
+    <path d="M53 22.5 L64.5 24.5" stroke="${K}" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M42 39 l-5 4 l6 0 l-4 4 l7 -2" fill="${G}" ${ink(1.6)}/>
   </svg>`;
 }
 

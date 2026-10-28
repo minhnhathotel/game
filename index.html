@@ -4,6 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vườn Thỏ Hồng</title>
+  <!-- cài thành app trên máy (Chrome/Edge) -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#3b3129">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -38,9 +43,13 @@
     <button class="tab" id="fertAll" aria-label="Bón phân cho các cây đang lớn" hidden>
       <span data-icon="fert"></span><b class="tab-n" id="fertN">0</b></button>
     <button class="tab" id="placeLand" aria-label="Đặt đất đã mua" hidden><span data-icon="land"></span></button>
+    <hr>
+    <button class="tab" id="installBtn" aria-label="Cài game thành app trên máy" hidden><span data-icon="install"></span></button>
+    <button class="tab" id="dlBtn" aria-label="Tải game về máy (chơi không cần mạng)"><span data-icon="download"></span></button>
   </nav>
   <div class="inv" id="inv"></div>
   <div id="speech"></div>
+  <div id="feed" aria-live="polite"></div>
 
   <div class="world-viewport">
     <div class="world" id="world">
@@ -92,6 +101,8 @@
       <div class="bunny" id="bunny"></div>
       </div>
       <div class="night" id="night"></div>
+      <button class="wolf" id="wolf" aria-label="Sói! Bấm để đánh đuổi" hidden>
+        <span class="wolf-body"></span><span class="wolf-eye"></span></button>
     </div>
   </div>
 
