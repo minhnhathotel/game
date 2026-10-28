@@ -1288,7 +1288,8 @@ function renderStoves() {
 function ingrHTML(r) {
   return Object.entries(r.in).map(([id, n]) => {
     const have = count(state.produce, id);
-    return `<span class="${have >= n ? '' : 'miss'}">${goodIco(id)} ${have}/${n}</span>`;
+    // ghi rõ tên nguyên liệu: có / cần
+    return `<span class="${have >= n ? '' : 'miss'}">${GOODS[id].name} <b>${have}/${n}</b></span>`;
   }).join('');
 }
 
