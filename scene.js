@@ -100,6 +100,43 @@ function shopSVG() {
   </svg>`;
 }
 
+// Bảng gỗ ghim giấy đặt hàng
+function boardSVG() {
+  const note = (x, y, r, c = '#efe8da') => `<g transform="translate(${x} ${y}) rotate(${r})">
+    <polygon points="-14,-16 14,-17 15,16 -13,17" fill="${c}"/>
+    <path d="M-8 -6 h15 M-8 0 h13 M-8 6 h10" stroke="#8a7a5e" stroke-width="2"/>
+    <circle cx="0" cy="-13" r="3" fill="#b8332e"/></g>`;
+  return `<svg viewBox="0 0 160 150">
+    <ellipse class="sh" cx="80" cy="142" rx="64" ry="8" fill="rgba(20,15,10,.35)"/>
+    <polygon points="30,40 40,40 42,142 32,142" fill="#5e4430"/>
+    <polygon points="120,38 130,38 128,142 118,142" fill="#5e4430"/>
+    <polygon points="12,30 150,24 152,102 10,108" fill="#86663f"/>
+    <path d="M12 56 L151 51 M11 82 L152 77" stroke="#5e4430" stroke-width="2.5"/>
+    <polygon points="4,30 80,6 156,24 150,32 80,16 10,38" fill="#5a2a22"/>
+    ${note(40, 66, -6)}${note(80, 62, 4, '#e3d39a')}${note(120, 68, -3)}
+  </svg>`;
+}
+
+// Cầu gỗ câu cá chìa ra ao: ván gỗ trên các cọc, cuối cầu có cần câu cắm sẵn
+function dockSVG() {
+  const planks = Array.from({ length: 8 }, (_, i) => {
+    const x = 6 + i * 20;
+    return `<polygon points="${x},34 ${x + 19},33 ${x + 20},56 ${x + 1},57" fill="${i % 2 ? '#8a6a45' : '#7a5a3a'}"/>`;
+  }).join('');
+  const post = 'M18 56 L18 82 M62 56 L62 84 M106 56 L106 84 M150 56 L150 82';
+  return `<svg viewBox="0 0 170 90">
+    <ellipse class="sh" cx="90" cy="82" rx="76" ry="7" fill="rgba(20,15,10,.25)"/>
+    <path d="${post}" stroke="${K}" stroke-width="8" stroke-linecap="round"/>
+    <path d="${post}" stroke="#5e4430" stroke-width="4" stroke-linecap="round"/>
+    ${planks}
+    <path d="M10 40 L164 38 M10 50 L164 49" stroke="#5e4430" stroke-width="1.5"/>
+    <path d="M152 36 L160 4" stroke="${K}" stroke-width="5" stroke-linecap="round"/>
+    <path d="M152 36 L160 4" stroke="#b08a5a" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M160 4 Q170 30 168 62" stroke="#e8e0cc" stroke-width="1.2" fill="none"/>
+    <rect x="118" y="24" width="18" height="12" rx="2" fill="#6b675f"/>
+  </svg>`;
+}
+
 // ---------- Cây cối & vật trang trí ----------
 // Cụm hình tròn có viền mực liền mạch
 function cloud(circles, fill, outline, w = 6) {
@@ -148,6 +185,139 @@ function berrySVG() {
     <g fill="#5e8048">${C.map(([x, y, r]) => `<circle cx="${x - 2}" cy="${y - 3}" r="${r * .7}"/>`).join('')}</g>
     ${berries.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.6" fill="#b8332e" ${ink(1.5)}/>`).join('')}
   </svg>`;
+}
+
+// ---------- Biểu tượng giao diện (vẽ tay cùng nét mực với bản đồ) ----------
+function uiIcon(name) {
+  const o = (w = 2.4) => `stroke="${K}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"`;
+  const art = {
+    storage: `<path d="M8 16 L32 16 L29 34 L11 34 Z" fill="#a8835a" ${o()}/><path d="M10 22 H30 M11 28 H29" stroke="#6b4f33" stroke-width="2"/>
+      <path d="M12 16 Q20 4 28 16" fill="none" ${o(3)}/>`,
+    kitchen: `<path d="M7 18 H33 L31 32 Q20 37 9 32 Z" fill="#6b675f" ${o()}/><path d="M5 18 H35" ${o(3)}/>
+      <path d="M14 14 q-2 -4 1 -8 M20 14 q-2 -4 1 -8 M26 14 q-2 -4 1 -8" fill="none" stroke="#efe8da" stroke-width="2" stroke-linecap="round"/>`,
+    shop: `<path d="M14 10 L26 10 L23 15 Q34 20 32 30 Q30 36 20 36 Q10 36 8 30 Q6 20 17 15 Z" fill="#c9a36b" ${o()}/><path d="M15 15 H25" ${o(2)}/>
+      <circle cx="20" cy="27" r="5" fill="#d9b84a" ${o(1.6)}/>`,
+    fire: `<path d="M20 4 C30 14 32 24 26 32 C22 37 18 37 14 32 C8 24 12 16 16 12 C16 18 18 20 20 20 C22 14 18 10 20 4 Z" fill="#e8742a" ${o()}/>
+      <path d="M20 22 C24 26 24 31 20 34 C16 31 16 26 20 22 Z" fill="#ffd36b"/>`,
+    pond: `<path d="M28 20 L37 13 L36 20 L37 27 Z" fill="#7d8a8c" ${o(2)}/><path d="M4 20 Q12 9 24 11 Q30 13 30 20 Q30 27 24 29 Q12 31 4 20 Z" fill="#7d8a8c" ${o()}/>
+      <circle cx="10" cy="18" r="1.8" fill="${K}"/><path d="M14 23 Q20 27 26 23" stroke="#d8d0b8" stroke-width="2" fill="none"/>`,
+    orders: `<rect x="9" y="8" width="22" height="26" rx="2" fill="#efe8da" ${o()}/><path d="M13 15 H27 M13 20 H27 M13 25 H22" stroke="#8a7a5e" stroke-width="2"/>
+      <circle cx="20" cy="8" r="3" fill="#b8332e" ${o(1.5)}/>`,
+    book: `<path d="M6 10 Q13 7 20 11 Q27 7 34 10 L34 32 Q27 29 20 33 Q13 29 6 32 Z" fill="#efe2c2" ${o()}/><path d="M20 11 V33" ${o(2)}/>
+      <path d="M9 15 Q13 13 17 15 M23 15 Q27 13 31 15 M9 20 Q13 18 17 20 M23 20 Q27 18 31 20" stroke="#8a7a5e" stroke-width="1.6" fill="none"/>`,
+    water: `<path d="M8 16 H26 L25 33 H9 Z" fill="#7d8a8c" ${o()}/><path d="M26 20 L35 12" ${o(3)}/><path d="M12 16 Q17 8 22 16" fill="none" ${o(2.4)}/>
+      <path d="M37 17 l1 3 M34 21 l0 3" stroke="#6fa0c8" stroke-width="2.2" stroke-linecap="round"/>`,
+    harvest: `<path d="M9 35 L19 24" ${o(4.5)}/><path d="M9 35 L19 24" stroke="#8a6a45" stroke-width="2"/>
+      <path d="M19 24 C10 14 18 3 31 5 C23 8 19 14 23 22 Z" fill="#b8b4ab" ${o(2)}/>`,
+    fert: `<path d="M7 31 H33" ${o(2.4)}/><path d="M20 31 V18" ${o(2.4)}/>
+      <path d="M20 20 C14 20 10 16 10 11 C16 11 20 14 20 20 Z M20 18 C26 18 30 14 30 9 C24 9 20 12 20 18 Z" fill="#7fa04a" ${o(1.8)}/>
+      <circle cx="12" cy="34" r="1.8" fill="#efe8da" ${o(1)}/><circle cx="27" cy="34" r="1.8" fill="#efe8da" ${o(1)}/>`,
+    land: `<path d="M30 5 L17 22" ${o(4.5)}/><path d="M30 5 L17 22" stroke="#8a6a45" stroke-width="2"/>
+      <path d="M14 18 L22 26 L14 35 Q6 33 6 26 Z" fill="#9c988f" ${o(2)}/><path d="M27 3 L34 9" ${o(3.2)}/>`,
+    energy: `<path d="M25 12 C31 16 31 21 27 25 L10 36 L16 18 C18 14 21 11 25 12 Z" fill="#d9772e" ${o()}/>
+      <path d="M25 12 L28 4 M26 13 L34 8 M26 13 L33 15" stroke="#4b6a3e" stroke-width="3" stroke-linecap="round"/>`,
+    poison: `<path d="M8 18 Q8 6 20 6 Q32 6 32 18 Q32 24 28 26 L28 33 H12 L12 26 Q8 24 8 18 Z" fill="#9cc46c" ${o()}/>
+      <circle cx="15" cy="18" r="3.4" fill="${K}"/><circle cx="25" cy="18" r="3.4" fill="${K}"/><path d="M16 33 V28 M20 33 V28 M24 33 V28" ${o(1.6)}/>`,
+    axe: `<path d="M12 36 L26 8" ${o(4.5)}/><path d="M12 36 L26 8" stroke="#8a6a45" stroke-width="2.2"/><path d="M22 6 Q35 6 36 19 L26 16 Z" fill="#9c988f" ${o(2)}/>`,
+    rod: `<path d="M6 36 L30 4" ${o(4)}/><path d="M6 36 L30 4" stroke="#b08a5a" stroke-width="2"/><path d="M30 4 Q37 16 34 28" stroke="${K}" stroke-width="1.2" fill="none"/>
+      <circle cx="34" cy="30" r="3" fill="#c94a3a" ${o(1.4)}/><circle cx="12" cy="28" r="3.5" fill="#6b675f" ${o(1.5)}/>`,
+    coin: `<circle cx="20" cy="20" r="14" fill="#d9b84a" ${o()}/><circle cx="20" cy="20" r="9" fill="none" stroke="#a8862a" stroke-width="2"/>
+      <path d="M16 16 H24 M20 16 V26" stroke="#a8862a" stroke-width="2.6" stroke-linecap="round"/>`,
+  }[name] || '';
+  return `<svg viewBox="0 0 40 40" aria-hidden="true">${art}</svg>`;
+}
+
+// ---------- Đồ đạc quanh nhà & bãi cỏ ----------
+function barrelSVG() {
+  return `<svg viewBox="0 0 40 46">
+    <ellipse cx="20" cy="43" rx="16" ry="3" fill="rgba(20,15,10,.35)"/>
+    <path d="M6 8 Q4 24 6 40 L34 40 Q36 24 34 8 Z" fill="#86663f" ${ink(2.4)}/>
+    <path d="M5 16 H35 M5 32 H35" stroke="${K}" stroke-width="3"/>
+    <ellipse cx="20" cy="8" rx="14" ry="4" fill="#a8835a" ${ink(2.2)}/>
+  </svg>`;
+}
+// sọt gỗ đựng cà rốt, cà chua
+function crateSVG() {
+  return `<svg viewBox="0 0 44 40">
+    <ellipse cx="22" cy="37" rx="19" ry="3" fill="rgba(20,15,10,.35)"/>
+    <circle cx="14" cy="11" r="5" fill="#d9772e" ${ink(1.6)}/><circle cx="25" cy="10" r="5" fill="#b8332e" ${ink(1.6)}/>
+    <polygon points="4,12 38,10 40,36 6,37" fill="#9c7a50" ${ink(2.4)}/>
+    <path d="M6 14 L38 34 M38 12 L7 35" stroke="#6b4f33" stroke-width="3"/>
+  </svg>`;
+}
+// đống củi xếp, có cây rìu dựng bên cạnh
+function woodpileSVG() {
+  const log = (x, y) => `<ellipse cx="${x}" cy="${y}" rx="7" ry="6.5" fill="#c9a36b" ${ink(2)}/>
+    <circle cx="${x}" cy="${y}" r="2.5" fill="none" stroke="#8a6a45" stroke-width="1.3"/>`;
+  return `<svg viewBox="0 0 60 44">
+    <ellipse cx="28" cy="41" rx="26" ry="3.5" fill="rgba(20,15,10,.35)"/>
+    ${log(10, 32)}${log(24, 33)}${log(38, 32)}${log(17, 20)}${log(31, 20)}${log(24, 9)}
+    <path d="M46 40 L54 8" stroke="${K}" stroke-width="5" stroke-linecap="round"/>
+    <path d="M46 40 L54 8" stroke="#8a6a45" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M50 10 L58 4 L60 16 Z" fill="#8d8a83" ${ink(1.6)}/>
+  </svg>`;
+}
+function logSVG() {
+  return `<svg viewBox="0 0 90 40">
+    <ellipse cx="45" cy="35" rx="40" ry="5" fill="rgba(20,15,10,.3)"/>
+    <path d="M10 14 L74 10 Q82 20 74 30 L10 32 Z" fill="#6b4f33" ${ink(2.5)}/>
+    <path d="M18 18 L64 15 M20 25 L60 23" stroke="#4e3a26" stroke-width="2"/>
+    <ellipse cx="10" cy="23" rx="7" ry="9" fill="#c9a36b" ${ink(2.5)}/>
+    <ellipse cx="10" cy="23" rx="3.5" ry="4.5" fill="none" stroke="#8a6a45" stroke-width="1.5"/>
+    <path d="M44 11 q4 -8 10 -6" stroke="#6f8a4a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  </svg>`;
+}
+// cụm nấm mũ đỏ & vàng chấm trắng
+function mushroomSVG() {
+  const cap = (x, y, r, c) => `<path d="M${x - r} ${y} Q${x - r} ${y - r * 1.1} ${x} ${y - r * 1.1} Q${x + r} ${y - r * 1.1} ${x + r} ${y} Z" fill="${c}" ${ink(2)}/>
+    <circle cx="${x - r * 0.4}" cy="${y - r * 0.6}" r="${r * 0.18}" fill="#efe8da"/><circle cx="${x + r * 0.35}" cy="${y - r * 0.45}" r="${r * 0.14}" fill="#efe8da"/>`;
+  const stalk = (x, y, h) => `<rect x="${x - 3}" y="${y}" width="6" height="${h}" rx="2" fill="#e8dcc0" ${ink(1.8)}/>`;
+  return `<svg viewBox="0 0 50 40">
+    <ellipse cx="25" cy="37" rx="20" ry="3.5" fill="rgba(20,15,10,.3)"/>
+    ${stalk(16, 22, 15)}${stalk(33, 26, 11)}${cap(16, 24, 11, '#a8382f')}${cap(33, 28, 8, '#c9963a')}
+  </svg>`;
+}
+
+// cụm nấm dại hái được: mọi cụm cùng một màu mũ, v chỉ đổi số cây trong cụm —
+// nhìn hoàn toàn không phân biệt được nấm độc hay nấm lành
+function wildShroomSVG(v = 0) {
+  const one = (x, y, r, h) => `<rect x="${x - 2.5}" y="${y}" width="5" height="${h}" rx="2" fill="#e8dcc0" ${ink(1.6)}/>
+    <path d="M${x - r} ${y + 1} Q${x - r} ${y - r} ${x} ${y - r} Q${x + r} ${y - r} ${x + r} ${y + 1} Z" fill="#a8683a" ${ink(1.8)}/>
+    <circle cx="${x - r * 0.35}" cy="${y - r * 0.45}" r="${r * 0.18}" fill="#efe8da"/><circle cx="${x + r * 0.3}" cy="${y - r * 0.3}" r="${r * 0.14}" fill="#efe8da"/>`;
+  return `<svg viewBox="0 0 40 34">
+    <ellipse cx="20" cy="31" rx="16" ry="3" fill="rgba(20,15,10,.3)"/>
+    ${one(13, 18, 8, 12)}${one(27, 22, 6, 8)}${v % 2 ? one(21, 26, 4, 5) : ''}
+  </svg>`;
+}
+
+// sỏi nhỏ rải hai bên mép đường mòn
+function renderPebbles() {
+  const edge = document.querySelector('.paths .edge');
+  const len = edge.getTotalLength();
+  seed = 23;
+  let html = '';
+  for (let s = 12; s < len - 2; s += rnd(24, 58)) {
+    const p = edge.getPointAtLength(s), q = edge.getPointAtLength(s + 1);
+    const n = Math.hypot(q.x - p.x, q.y - p.y) || 1;
+    const off = (rnd(0, 1) < 0.5 ? -1 : 1) * rnd(15, 25);
+    const x = p.x - ((q.y - p.y) / n) * off, y = p.y + ((q.x - p.x) / n) * off;
+    html += `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${rnd(2.5, 5).toFixed(1)}" ry="${rnd(2, 3.5).toFixed(1)}"
+      fill="${rnd(0, 1) < 0.5 ? '#9c988f' : '#7f7c75'}" stroke="${K}" stroke-width="1.5"/>`;
+  }
+  document.querySelector('.paths').insertAdjacentHTML('beforeend', `<g class="pebbles">${html}</g>`);
+}
+
+// gốc cây vừa bị chặt, có chồi non đang mọc lại; H = chiều cao khung (170 như pineSVG, 125 như birchSVG)
+function stumpSVG(H = 170) {
+  return `<svg viewBox="0 0 100 ${H}"><g transform="translate(0 ${H - 170})">
+    <ellipse cx="50" cy="160" rx="30" ry="7" fill="rgba(20,15,10,.35)"/>
+    <path d="M30 160 L33 132 L67 132 L70 160 Z" fill="#6b4f33" ${ink()}/>
+    <ellipse cx="50" cy="132" rx="17" ry="6" fill="#c9a36b" ${ink(2.5)}/>
+    <ellipse cx="50" cy="132" rx="9" ry="3" fill="none" stroke="#8a6a45" stroke-width="1.6"/>
+    <path d="M60 146 q8 -6 10 -16" stroke="${K}" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <path d="M60 146 q8 -6 10 -16" stroke="#6f8a4a" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+    <ellipse cx="71" cy="128" rx="5" ry="3" fill="#6f8a4a" ${ink(1.4)}/>
+  </g></svg>`;
 }
 
 function grassSVG() {
@@ -208,14 +378,58 @@ function torchSVG() {
   </svg>`;
 }
 
+// ---------- Ao ----------
+// Bờ ao theo toạ độ bản đồ (đi theo chiều kim đồng hồ). Mép trái chừa đường mòn ra cầu câu;
+// phần bên phải vượt khỏi khung 960 và lấn vào rừng ngoài (cây ở đó được bỏ đi).
+const POND_PTS = [
+  [648, 562], [700, 548], [760, 556], [830, 552], [900, 560], [950, 546], [990, 530], [1060, 524], [1130, 534],
+  [1200, 538], [1262, 558], [1320, 600], [1360, 662], [1386, 742], [1390, 830], [1372, 910], [1320, 972],
+  [1240, 1008], [1100, 1020], [960, 1012], [820, 1008], [700, 998], [640, 972], [608, 918], [590, 840],
+  [584, 764], [604, 712], [640, 680], [644, 640], [642, 600],
+];
+const POND_BOX = { x: 560, y: 500, w: 850, h: 540 };   // khung vẽ ao (có chừa bờ bùn)
+function inPond(x, y) {
+  let inside = false;
+  for (let i = 0, j = POND_PTS.length - 1; i < POND_PTS.length; j = i++) {
+    const [xi, yi] = POND_PTS[i], [xj, yj] = POND_PTS[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+// đường cong khép kín mềm mại đi qua các điểm (Catmull-Rom → Bézier)
+function smoothClosed(pts) {
+  const n = pts.length, f = (v) => v.toFixed(1);
+  let d = `M${f(pts[0][0])} ${f(pts[0][1])}`;
+  for (let i = 0; i < n; i++) {
+    const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+    d += ` C${f(p1[0] + (p2[0] - p0[0]) / 6)} ${f(p1[1] + (p2[1] - p0[1]) / 6)}`
+      + ` ${f(p2[0] - (p3[0] - p1[0]) / 6)} ${f(p2[1] - (p3[1] - p1[1]) / 6)} ${f(p2[0])} ${f(p2[1])}`;
+  }
+  return d + ' Z';
+}
+
 function pondSVG() {
-  const reed = (x, y, h) => `<path d="M${x} ${y} Q${x - 2} ${y - h / 2} ${x + 1} ${y - h}" stroke="${K}" stroke-width="2.5" fill="none"/>
-    <ellipse cx="${x + 1}" cy="${y - h + 4}" rx="3" ry="6" fill="#6b4f33" ${ink(1.5)}/>`;
-  return `<svg viewBox="0 0 200 120">
-    <path d="M14 66 C10 34 60 18 104 22 C150 24 196 40 192 70 C188 98 140 110 96 106 C50 104 18 96 14 66 Z" fill="#4f6f78" ${ink(3.5)}/>
-    <path d="M40 56 Q60 50 80 56 M110 72 Q130 66 150 72 M70 84 Q86 80 100 84" stroke="#7a99a0" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-    <ellipse cx="140" cy="44" rx="12" ry="5" fill="#6f8a4a" ${ink(1.5)}/>
-    ${reed(22, 70, 34)}${reed(30, 76, 28)}${reed(180, 60, 36)}${reed(172, 66, 26)}
+  const { x: ox, y: oy, w, h } = POND_BOX;
+  const local = POND_PTS.map(([x, y]) => [x - ox, y - oy]);
+  const cx = local.reduce((s, p) => s + p[0], 0) / local.length, cy = local.reduce((s, p) => s + p[1], 0) / local.length;
+  // vùng nước sâu: co bờ ao vào giữa, mỗi điểm co một chút khác nhau cho méo
+  const deep = local.map(([x, y], i) => [cx + (x - cx) * (0.5 + (i % 3) * 0.05), cy + (y - cy) * (0.52 + (i % 2) * 0.05)]);
+  const shore = smoothClosed(local);
+  const reed = (x, y, hh) => `<path d="M${x} ${y} Q${x - 3} ${y - hh / 2} ${x + 2} ${y - hh}" stroke="${K}" stroke-width="2.5" fill="none"/>
+    <ellipse cx="${x + 2}" cy="${y - hh + 6}" rx="4" ry="9" fill="#6b4f33" ${ink(1.5)}/>`;
+  const fish = (x, y, cls) => `<g class="fishshadow ${cls}">
+    <path d="M${x} ${y} q16 -8 28 0 q-12 8 -28 0 z M${x + 26} ${y} l10 -6 l0 12 z" fill="rgba(20,32,38,.45)"/></g>`;
+  const lily = (x, y, r) => `<ellipse cx="${x}" cy="${y}" rx="${r}" ry="${r * 0.45}" fill="#6f8a4a" ${ink(1.5)}/>`;
+  return `<svg viewBox="0 0 ${w} ${h}">
+    <path d="${shore}" fill="none" stroke="${K}" stroke-width="18" stroke-linejoin="round"/>
+    <path d="${shore}" fill="none" stroke="#8f7f58" stroke-width="13" stroke-linejoin="round"/>
+    <path d="${shore}" fill="#4f6f78" ${ink(3.5)}/>
+    <path d="${smoothClosed(deep)}" fill="#45646e"/>
+    <path d="M130 130 q18 -8 36 0 M300 210 q20 -8 40 0 M210 330 q16 -6 32 0 M420 150 q18 -7 36 0 M540 320 q20 -8 40 0
+      M640 160 q16 -6 32 0 M420 420 q18 -7 36 0" stroke="#7a99a0" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    ${fish(220, 220, 'a')}${fish(340, 300, 'b')}${fish(150, 180, 'b')}${fish(520, 240, 'a')}
+    ${lily(240, 140, 18)}${lily(120, 300, 12)}${lily(380, 260, 14)}${lily(600, 200, 16)}${lily(470, 380, 12)}
+    ${reed(44, 360, 36)}${reed(54, 378, 28)}${reed(66, 396, 32)}${reed(700, 66, 34)}${reed(714, 76, 26)}${reed(260, 62, 28)}
   </svg>`;
 }
 
@@ -251,25 +465,52 @@ for (let y = 60; y < 900; y += 110) {
 }
 for (let x = -40; x < 1000; x += 60) FRAME.push([pick(), x + rnd(-10, 10), rnd(830, 870), rnd(80, 110)]);
 
+// Cây rừng cạnh trái ruộng: chỉ nhích nhẹ để gốc cây không nằm trên cột đất đầu tiên (tán vẫn che bớt mép ruộng)
+FRAME.forEach((d) => {
+  const [t, x, y, w] = d, h = w * (t === 'pine' ? 1.7 : 1.25);
+  if (y + h > 455 && y + h * 0.6 < 790 && x + w * 0.8 > 0 && x < 60) d[1] = -w * 0.8;
+});
+// cây không mọc dưới ao: bỏ cây rừng có gốc hoặc thân nằm trong ao
+const treeInPond = (cx, top, h) => inPond(cx, top + h) || inPond(cx, top + h * 0.6);
+for (let i = FRAME.length - 1; i >= 0; i--) {
+  const [t, x, y, w] = FRAME[i];
+  if (treeInPond(x + w / 2, y, w * (t === 'pine' ? 1.7 : 1.25))) FRAME.splice(i, 1);
+}
+// cây phía dưới bản đồ xếp lớp theo chân cây giống cây trang trí, để cây gần người xem đè lên cây xa
+const frameZ = (d) => (d[2] > 600 ? 20 + Math.round(d[2] / 10) : 5 + Math.round((d[2] + 160) / 80));
+
 // [loại, x, y, chiều rộng px, biến thể]
 const DECOR = [
   ['boulder', 286, 186, 66], ['boulder', 728, 520, 54], ['boulder', 100, 340, 44],
   ['torch', 404, 300, 22], ['torch', 532, 300, 22],
   ['berry', 190, 318, 70], ['berry', 255, 322, 66], ['berry', 318, 316, 70],
   ['berry', 592, 318, 70], ['berry', 656, 322, 66], ['berry', 720, 316, 70],
-  ['birch', 612, 720, 110, 0], ['birch', 790, 730, 100, 2], ['birch', 205, 60, 80, 1], ['birch', 668, 58, 84, 0],
-  ['pond', 690, 590, 210],
-  ['sapling', 620, 580, 28], ['sapling', 860, 300, 26], ['sapling', 340, 250, 26],
-  ['grass', 250, 250, 40], ['grass', 640, 250, 40], ['grass', 700, 440, 40], ['grass', 780, 450, 40],
-  ['grass', 840, 520, 36], ['grass', 640, 640, 34], ['grass', 690, 860, 38], ['grass', 140, 410, 34],
+  ['birch', 205, 60, 80, 1], ['birch', 668, 58, 84, 0],
+  ['pond', POND_BOX.x, POND_BOX.y, POND_BOX.w],   // bờ ao xem POND_PTS
+  // đồ đạc cạnh nhà kho, nhà bếp, cửa hàng & trên bãi cỏ
+  ['barrel', 234, 262, 30], ['barrel', 256, 276, 26], ['woodpile', 578, 180, 54], ['crate', 682, 266, 38],
+  ['log', 650, 418, 62],
+  ['sapling', 566, 548, 28], ['sapling', 860, 300, 26], ['sapling', 340, 250, 26],
+  ['grass', 250, 250, 40], ['grass', 640, 250, 40], ['grass', 700, 440, 40],
+  ['grass', 552, 640, 34], ['grass', 140, 410, 34],
+  // cây mọc ở hàng dưới ruộng: chặt đi mới có chỗ đặt thêm đất
+  ['pine', 22, 628, 92], ['pine', 98, 676, 70], ['birch', 165, 650, 100, 0], ['pine', 240, 690, 66],
+  ['pine', 300, 632, 90], ['birch', 372, 680, 84, 1], ['pine', 448, 630, 92], ['pine', 522, 676, 72],
+  ['pine', 60, 740, 80], ['birch', 270, 760, 90, 2], ['pine', 470, 744, 78],
+  // lớp cây dày phía dưới, giáp bìa rừng
+  ['pine', 136, 722, 74], ['birch', 196, 742, 86, 1], ['pine', 336, 726, 70], ['pine', 404, 762, 84],
+  ['birch', 536, 734, 80, 2],['pine', 14, 792, 88], ['birch', 108, 802, 96, 0],
+  ['pine', 228, 806, 80], ['pine', 300, 790, 72], ['pine', 356, 818, 90], ['birch', 448, 800, 92, 1],
+  ['pine', 518, 812, 84],
 ];
 const FLOWERS = [
-  [380, 230, 0], [552, 236, 1], [720, 470, 2], [800, 480, 0], [660, 470, 3], [640, 790, 1], [660, 690, 2],
+  [380, 230, 0], [552, 236, 1], [720, 470, 2], [660, 470, 3], [566, 700, 2],
 ];
 const DRAW = {
   pine: () => pineSVG(Math.floor(rnd(0, 3))), birch: (v) => birchSVG(v ?? Math.floor(rnd(0, 3))),
   berry: berrySVG, grass: grassSVG, sapling: saplingSVG, boulder: boulderSVG,
   campfire: campfireSVG, torch: torchSVG, pond: pondSVG,
+  barrel: barrelSVG, crate: crateSVG, woodpile: woodpileSVG, log: logSVG, mushroom: mushroomSVG,
 };
 
 // Rừng lấp kín phần màn hình ngoài khung 960×960 (vẽ chung trong 1 SVG để nhẹ máy)
@@ -280,7 +521,9 @@ function renderForest(W, H, ox, oy) {
     for (let x = -50; x < W; x += 62) {
       const tx = x + rnd(-14, 14), ty = y + rnd(-12, 12);
       const inside = tx > ox - 30 && tx < ox + 900 && ty > oy - 60 && ty < oy + 860;
-      if (!inside) trees.push([tx, ty, rnd(80, 110), pick()]);
+      const w = rnd(80, 110), kind = pick();
+      // khung cây cao w × 1.7, cây vẽ sát đáy khung; toạ độ ao tính theo khung bản đồ 960
+      if (!inside && !treeInPond(tx + w / 2 - ox, ty - oy, w * 1.7)) trees.push([tx, ty, w, kind]);
     }
   }
   trees.sort((a, b) => a[1] - b[1]);
@@ -297,17 +540,23 @@ function renderScene() {
   document.querySelector('#b-storage .bsvg').innerHTML = barnSVG();
   document.querySelector('#b-shop .bsvg').innerHTML = shopSVG();
   document.querySelector('#b-fire .bsvg').innerHTML = campfireSVG();
+  document.querySelector('#b-orders .bsvg').innerHTML = boardSVG();
+  document.querySelector('#b-pond .bsvg').innerHTML = dockSVG();
 
-  const item = ([t, x, y, w, v], z) =>
-    `<div class="decor" style="left:${x}px; top:${y}px; width:${w}px; z-index:${z}">${DRAW[t](v)}</div>`;
-  const items = FRAME.map((d) => item(d, 2 + Math.round((d[2] + 160) / 80)))
-    .concat(DECOR.map((d) => item(d, 20 + Math.round(d[2] / 10))));
+  // cây (pine/birch) có data-tree để game.js cho chặt; mọi vật đều có data-kind để tính chỗ trống đặt đất
+  const item = ([t, x, y, w, v], z, id) =>
+    `<div class="decor" data-kind="${t}"${t === 'pine' || t === 'birch' ? ` data-tree="${id}"` : ''}
+      style="left:${x}px; top:${y}px; width:${w}px; z-index:${z}">${DRAW[t](v)}</div>`;
+  const items = FRAME.map((d, k) => item(d, frameZ(d), 'f' + k))
+    // ao nằm sát mặt đất (dưới cầu câu & cây cối)
+    .concat(DECOR.map((d, k) => item(d, d[0] === 'pond' ? 3 : 20 + Math.round(d[2] / 10), 'd' + k)));
   const flowers = FLOWERS.map(([x, y, v]) =>
-    `<div class="decor" style="left:${x}px; top:${y}px; width:16px; z-index:${20 + Math.round(y / 10)}">${flowerSVG(v)}</div>`);
+    `<div class="decor" data-kind="flower" style="left:${x}px; top:${y}px; width:16px; z-index:${20 + Math.round(y / 10)}">${flowerSVG(v)}</div>`);
   // lá rơi & đom đóm
   const leaves = Array.from({ length: 12 }, (_, i) =>
     `<span class="leaf" style="left:${(i * 83) % 960}px; animation-delay:${(i * 1.7) % 14}s; animation-duration:${11 + (i % 4) * 2}s"></span>`);
   const flies = Array.from({ length: 10 }, (_, i) =>
     `<span class="firefly" style="left:${120 + ((i * 97) % 720)}px; top:${260 + ((i * 53) % 560)}px; animation-delay:${i * .8}s"></span>`);
   document.getElementById('decor').innerHTML = items.join('') + flowers.join('') + leaves.join('') + flies.join('');
+  renderPebbles();
 }

@@ -8,6 +8,7 @@ const MOUND = `<path d="M10 54 Q12 46 30 45 Q48 46 50 54 Z" fill="#4a3426" ${ci(
 const LEAF_COLOR = {
   muong: '#6f9a3e', hanh: '#7fa64a', cai: '#4f7a3a', duachuot: '#5f8a3a', carot: '#7aa04a',
   catim: '#5a7a3a', cachua: '#5f8a3a', ngo: '#8aa04a', khoaitay: '#5e7e3a', bido: '#6a8a3a',
+  ngaicuu: '#8fa88a', tiato: '#7a3f6e',
 };
 const TALL = { ngo: 1, cachua: 1, hanh: 1 };
 
@@ -30,6 +31,14 @@ function ripeSVG(id, L) {
     case 'hanh':
       return [18, 24, 30, 36, 42].map((x, i) => stem(x, 50, x + (i - 2) * 3, 8 + (i % 2) * 6, L, 3.6)).join('') +
         [22, 30, 38].map((x) => `<ellipse cx="${x}" cy="49" rx="4.5" ry="3.5" fill="#efe8da" ${ci(1.6)}/>`).join('');
+    case 'ngaicuu':
+      return [[22, 14], [30, 8], [38, 14]].map(([x, y]) => stem(30, 50, x, y, '#7a9a5a', 2.6)).join('') +
+        [[21, 18, -150], [23, 28, -30], [29, 12, -120], [31, 24, -60], [38, 18, -40], [37, 30, -150], [24, 38, -160], [36, 40, -20]]
+          .map(([x, y, a]) => leaf(x, y, 12, a, L, .45)).join('');
+    case 'tiato':
+      return stem(30, 50, 30, 14, '#6b4a5a', 3.4) +
+        [[-160, 40], [-20, 40], [-150, 29], [-30, 29], [-120, 19], [-60, 19]].map(([a, y]) => leaf(30, y, 16, a, L, .65)).join('') +
+        `<ellipse cx="30" cy="13" rx="4" ry="5" fill="${L}" ${ci(1.6)}/>`;
     case 'cai':
       return [-165, -128, -90, -52, -15].map((a) => leaf(30, 46, 19, a, L, .7)).join('') +
         `<ellipse cx="30" cy="44" rx="5" ry="4" fill="#9fc07a" ${ci(1.6)}/>`;
@@ -109,5 +118,82 @@ function bugSVG() {
   </svg>`;
 }
 
-// biểu tượng nhỏ cho thẻ/nút: chỉ vẽ cây đã chín
-function cropIco(id) { return `<span class="cico">${cropSVG(id, 3)}</span>`; }
+// bụi cỏ dại xanh mọc ở khe giữa các mảnh đất; v lẻ thì có bông hoa trắng nhỏ
+function weedSVG(v = 0) {
+  const c = ['#6f8a4a', '#5e7a3a', '#87a35a'][v % 3];
+  return `<svg viewBox="0 0 40 36">
+    <ellipse cx="20" cy="33" rx="14" ry="3" fill="rgba(20,15,10,.3)"/>
+    <path d="M8 34 Q6 20 1 10 Q12 18 14 34 Z M15 34 Q15 14 19 2 Q24 16 22 34 Z M22 34 Q26 18 37 8 Q31 22 29 34 Z" fill="${c}" ${ci(1.8)}/>
+    ${v % 2 ? `<circle cx="19" cy="4" r="2.8" fill="#e8e0cc" ${ci(1.2)}/>` : ''}
+  </svg>`;
+}
+
+// châu chấu xanh, chân sau gập cao
+function hopperSVG() {
+  return `<svg viewBox="0 0 44 28">
+    <path d="M14 18 L6 26 M20 19 L18 27 M28 19 L32 27" stroke="${CK}" stroke-width="1.6" stroke-linecap="round"/>
+    <path d="M22 14 L34 4 L40 22" fill="none" stroke="${CK}" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M22 14 L34 4 L40 22" fill="none" stroke="#9cb84a" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M4 14 Q8 8 24 9 Q34 10 34 15 Q30 20 14 19 Q6 19 4 14 Z" fill="#8fae3a" ${ci(1.8)}/>
+    <path d="M12 10 Q20 6 30 11" fill="none" stroke="#6f8a2a" stroke-width="2"/>
+    <circle cx="7" cy="13" r="1.6" fill="${CK}"/>
+    <path d="M5 10 Q2 3 -1 1 M7 10 Q8 3 6 -1" stroke="${CK}" stroke-width="1.3" fill="none"/>
+  </svg>`;
+}
+
+// bọ cánh cứng xanh đen bóng
+function beetleSVG() {
+  return `<svg viewBox="0 0 36 30">
+    <path d="M8 10 L1 6 M7 16 L0 17 M8 22 L2 27 M28 10 L35 6 M29 16 L36 17 M28 22 L34 27" stroke="${CK}" stroke-width="1.6" stroke-linecap="round"/>
+    <circle cx="18" cy="6" r="5" fill="#2e2a24" ${ci(1.6)}/>
+    <ellipse cx="18" cy="18" rx="11" ry="10" fill="#3f5a6e" ${ci(1.8)}/>
+    <path d="M18 8 V28" stroke="${CK}" stroke-width="1.6"/>
+    <ellipse cx="13" cy="15" rx="2.5" ry="3.5" fill="rgba(255,255,255,.3)"/>
+  </svg>`;
+}
+
+function fishSVG(color, belly) {
+  return `<svg viewBox="0 0 60 36">
+    <path d="M44 18 L58 6 L56 18 L58 30 Z" fill="${color}" ${ci(2)}/>
+    <path d="M24 9 Q30 1 39 9" fill="${color}" ${ci(1.6)}/>
+    <path d="M4 18 Q14 4 32 6 Q46 8 48 18 Q46 28 32 30 Q14 32 4 18 Z" fill="${color}" ${ci(2.2)}/>
+    <path d="M10 22 Q24 30 42 22 Q30 27 10 22 Z" fill="${belly}"/>
+    <circle cx="12" cy="15" r="2.4" fill="${CK}"/><circle cx="12.6" cy="14.4" r=".8" fill="#fff"/>
+    <path d="M20 11 Q23 18 20 25" stroke="${CK}" stroke-width="1.4" fill="none"/>
+  </svg>`;
+}
+
+function shrimpSVG() {
+  return `<svg viewBox="0 0 50 40">
+    <path d="M8 10 Q30 0 40 16 Q46 28 34 34 L30 28 Q38 22 32 16 Q24 10 10 16 Z" fill="#d98a5a" ${ci(2)}/>
+    <path d="M34 34 L28 38 M34 34 L38 39" stroke="${CK}" stroke-width="2" stroke-linecap="round"/>
+    <path d="M18 7 L20 15 M26 7 L27 14 M33 12 L31 18" stroke="#a85a32" stroke-width="1.6"/>
+    <circle cx="12" cy="11" r="1.8" fill="${CK}"/>
+    <path d="M9 11 Q0 5 2 -1 M10 10 Q6 1 12 -3" stroke="${CK}" stroke-width="1.2" fill="none"/>
+  </svg>`;
+}
+
+// bộ xương cá: đầu, sống lưng, các nhánh xương sườn, đuôi
+function boneSVG() {
+  const ribs = [18, 25, 32, 39].map((x) => `M${x} 18 L${x - 4} 8 M${x} 18 L${x - 4} 28`).join(' ');
+  return `<svg viewBox="0 0 60 36">
+    <path d="M14 18 L50 18 ${ribs}" stroke="${CK}" stroke-width="4.6" stroke-linecap="round" fill="none"/>
+    <path d="M14 18 L50 18 ${ribs}" stroke="#efe8da" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+    <path d="M48 18 L58 9 L56 18 L58 27 Z" fill="#efe8da" ${ci(1.8)}/>
+    <path d="M3 18 Q6 8 15 10 L15 26 Q6 28 3 18 Z" fill="#efe8da" ${ci(2)}/>
+    <circle cx="9" cy="16" r="2" fill="${CK}"/>
+  </svg>`;
+}
+
+// hình của đồ bắt được (côn trùng, cá, tôm, xương cá)
+function catchSVG(id) {
+  const c = CATCH[id];
+  if (c.art === 'fish') return fishSVG(c.color, c.belly);
+  return { worm: bugSVG, hopper: hopperSVG, beetle: beetleSVG, shrimp: shrimpSVG, bone: boneSVG, mushroom: () => wildShroomSVG(0) }[c.art]();
+}
+
+// biểu tượng nhỏ cho thẻ/nút: nông sản vẽ cây đã chín (đột biến thì đổi màu phát sáng), đồ bắt được vẽ con vật
+function goodIco(id) {
+  if (MUTANTS[id]) return `<span class="cico mutant">${cropSVG(MUTANTS[id].base, 3)}</span>`;
+  return `<span class="cico">${CROPS[id] ? cropSVG(id, 3) : catchSVG(id)}</span>`;
+}
