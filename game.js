@@ -24,15 +24,16 @@ const cellTilt = (c, r) => ((((c * 17 + r * 31) % 7) + 7) % 7 - 3) * 0.8;
 const OFFLINE_FIRE_MS = 16 * 3600 * 1000;
 const MAX_STOVES = 4;
 const COST = { plant: 2, water: 1, harvest: 1, bug: 1, chop: 3, fish: 2, pick: 1, pave: 1 };
-// Đồ hái lượm trên bản đồ: hái xong thì biến mất, regrow mili giây sau mọc lại ở 1 chỗ trống ngẫu nhiên.
-// give/n = thu được gì, bao nhiêu; wood = được củi; cost = năng lượng (mặc định COST.pick); w = cỡ khi mọc mới
+// Đồ hái lượm trên bản đồ: hái xong thì biến mất, tới đêm mới mọc lại ở 1 chỗ trống ngẫu nhiên
+// (xem nightRegrowAt). give/n = thu được gì, bao nhiêu; wood = được củi; cost = năng lượng (mặc định COST.pick);
+// w = cỡ khi mọc mới
 const FORAGE = {
-  berry:   { give: 'quamong', n: 3, w: 66, regrow: 60000, title: 'Bụi quả mọng dại — bấm để hái quả' },
-  flower:  { give: 'hoadai',  n: 1, w: 16, regrow: 40000, title: 'Hoa dại — bấm để hái' },
-  grass:   { give: 'cokho',   n: 2, w: 36, regrow: 40000, title: 'Cỏ dại — bấm để cắt' },
-  sapling: { give: 'canhcay', n: 2, w: 26, regrow: 50000, title: 'Cây non — bấm để bẻ cành' },
-  boulder: { give: 'dacuoi',  n: 2, w: 52, regrow: 90000, cost: 2, title: 'Tảng đá — bấm để nhặt đá cuội' },
-  log:     { wood: 2,               w: 62, regrow: 120000, cost: 2, title: 'Khúc gỗ mục — bấm để lấy củi' },
+  berry:   { give: 'quamong', n: 3, w: 66, title: 'Bụi quả mọng dại — bấm để hái quả' },
+  flower:  { give: 'hoadai',  n: 1, w: 16, title: 'Hoa dại — bấm để hái' },
+  grass:   { give: 'cokho',   n: 2, w: 36, title: 'Cỏ dại — bấm để cắt' },
+  sapling: { give: 'canhcay', n: 2, w: 26, title: 'Cây non — bấm để bẻ cành' },
+  boulder: { give: 'dacuoi',  n: 2, w: 52, cost: 2, title: 'Tảng đá — bấm để nhặt đá cuội' },
+  log:     { wood: 2,               w: 62, cost: 2, title: 'Khúc gỗ mục — bấm để lấy củi' },
 };
 // lần đầu chơi: lấy đúng các bụi cây, hoa, đá… đang vẽ sẵn trên bản đồ
 function initialForage() {
@@ -1044,6 +1045,15 @@ function freeSpot(kind) {
   }
   return null;
 }
+// lúc đồ hái xong sẽ mọc lại: 1 thời điểm ngẫu nhiên trong đêm tới (tối hẳn → trước khi sáng),
+// hái ban ngày thì mọc trong đêm nay, đang đêm mới hái thì phải đợi tới đêm mai
+function nightRegrowAt() {
+  const now = Date.now(), { f } = dayClock();
+  const dayStart = now - f * CYCLE_MS;
+  const nightStart = dayStart + NIGHT_AT * CYCLE_MS + (f >= NIGHT_AT ? CYCLE_MS : 0);
+  const nightLen = (1 - NIGHT_AT + DAWN_END) * CYCLE_MS;
+  return nightStart + Math.random() * nightLen * 0.85;
+}
 function spawnForage(kind) {
   const spot = freeSpot(kind);
   if (!spot) return false;
@@ -1056,7 +1066,7 @@ function pickForage(id) {
   const f = state.forage[i], F = FORAGE[f.kind];
   if (!useEnergy(F.cost || COST.pick)) return;
   state.forage.splice(i, 1);
-  state.forageWait.push({ kind: f.kind, at: Date.now() + F.regrow });
+  state.forageWait.push({ kind: f.kind, at: nightRegrowAt() });
   if (F.wood) {
     state.wood += F.wood;
     toast(`🪵 Nhặt được ${F.wood} bó củi từ khúc gỗ mục`);
