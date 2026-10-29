@@ -16,7 +16,15 @@ const CROPS = {
   ngo:      { name: 'Ngô ngọt',   icon: '🌽', days: 80,  seed: 25, sell: 14, yield: 3, xp: 12, level: 4, note: 'Bẻ bắp sau 75–85 ngày khi râu chuyển nâu.' },
   khoaitay: { name: 'Khoai tây',  icon: '🥔', days: 90,  seed: 30, sell: 12, yield: 4, xp: 14, level: 4, note: 'Trồng bằng củ giống, đào củ sau ~90 ngày.' },
   bido:     { name: 'Bí đỏ',      icon: '🎃', days: 100, seed: 40, sell: 45, yield: 1, xp: 18, level: 5, note: 'Quả to, chín sau 90–110 ngày.' },
+  // water: chỉ trồng được ở ô sen dưới ao, không cần tưới, không bị sâu
+  sen:      { name: 'Hoa sen',    icon: '🪷', days: 70,  seed: 35, sell: 22, yield: 2, xp: 16, level: 2, water: true,
+              note: 'Thả ngó sen xuống ô nước ở ao, nở hoa sau ~70 ngày. Hái sen coi chừng cá khổng lồ!' },
 };
+
+// Ao sen: mỗi lần hái sen có thể gặp cá khổng lồ. Thỏ thường bị cá kéo xuống ao (chết);
+// thỏ đang phình to vì ăn đồ đột biến thì đánh thắng và bắt được cá.
+const GIANT_FISH_RATE = 0.03;
+const GIANT_FISH_RATE_BIG = 0.35;   // cá bị thỏ khổng lồ khiêu khích nên hay ngoi lên hơn
 
 // Tự chế biến: tỷ lệ món bị hỏng theo cách nấu (giảm 2% mỗi cấp, tối thiểu 5%)
 const METHODS = {
@@ -69,6 +77,15 @@ const RECIPES = {
   canhnam:   { name: 'Canh nấm rau cải',       icon: '🍲', in: { nam: 2, cai: 1 },                 time: 14, sell: 44,  energy: 28 },
   chaonam:   { name: 'Cháo cá nấm',            icon: '🥣', in: { nam: 1, carophi: 1, hanh: 1 },    time: 16, sell: 58,  energy: 34 },
   launam:    { name: 'Lẩu nấm',                icon: '🍲', in: { nam: 3, cai: 1, cachua: 1 },      time: 22, sell: 86,  energy: 45 },
+  // món từ đồ hái lượm
+  mutqua:    { name: 'Mứt quả mọng',           icon: '🫙', in: { quamong: 4 },                     time: 12, sell: 30,  energy: 22 },
+  trahoa:    { name: 'Trà hoa dại',            icon: '🍵', in: { hoadai: 2 },                      time: 6,  sell: 14,  energy: 10 },
+  // món có hoa sen trồng ở ao
+  trasen:    { name: 'Trà hoa sen',            icon: '🍵', in: { sen: 1 },                         time: 6,  sell: 32,  energy: 15 },
+  chesen:    { name: 'Chè hạt sen',            icon: '🍧', in: { sen: 2 },                         time: 15, sell: 70,  energy: 30 },
+  goisen:    { name: 'Gỏi ngó sen tôm',        icon: '🥗', in: { sen: 1, tom: 1, carot: 1 },       time: 12, sell: 68,  energy: 30 },
+  cahapsen:  { name: 'Cá chép hấp lá sen',     icon: '🍱', in: { cachep: 1, sen: 1, hanh: 1 },     time: 18, sell: 82,  energy: 38 },
+  canuong:   { name: 'Cá khổng lồ nướng lá sen', icon: '🐟', in: { cakhonglo: 1, sen: 2 },         time: 30, sell: 360, energy: 90 },
 };
 
 // Đồ bắt được: côn trùng phá rau (bắt trên ruộng, dùng làm mồi câu) & cá tôm câu ở ao.
@@ -81,10 +98,18 @@ const CATCH = {
   carophi:  { name: 'Cá rô phi', art: 'fish', color: '#7d8a8c', belly: '#d8d0b8', sell: 12, xp: 5,  snap: 0.05 },
   cachep:   { name: 'Cá chép',   art: 'fish', color: '#c9963a', belly: '#e8d8a0', sell: 18, xp: 7,  snap: 0.09 },
   caloc:    { name: 'Cá lóc',    art: 'fish', color: '#4e5a48', belly: '#a8a890', sell: 26, xp: 10, snap: 0.16 },
+  // không câu được, chỉ bắt được lúc thỏ phình to hái sen; level 99 để khách không đặt hàng món này
+  cakhonglo:{ name: 'Cá khổng lồ', art: 'giantfish', sell: 180, xp: 30, level: 99 },
   // ăn món có cá thì còn lại xương (mỗi con cá 1 xương); đem ủ làm phân bón
   xuongca:  { name: 'Xương cá',  art: 'bone', sell: 1 },
   // hái ở bãi cỏ, rìa rừng; nấm độc trông y hệt nấm lành
   nam:      { name: 'Nấm dại',   art: 'mushroom', sell: 4 },
+  // đồ hái lượm trên bản đồ (bụi quả, hoa, cỏ, cây non, tảng đá); hái xong mọc lại ở chỗ khác
+  quamong:  { name: 'Quả mọng dại', art: 'berry', sell: 3 },
+  hoadai:   { name: 'Hoa dại',      art: 'flower', sell: 2 },
+  cokho:    { name: 'Cỏ dại',       art: 'grass', sell: 1 },
+  canhcay:  { name: 'Cành cây',     art: 'twig', sell: 1 },
+  dacuoi:   { name: 'Đá cuội',      art: 'stone', sell: 2 },
 };
 // Phân bón: ủ 1 xương cá được 1 phần, mỗi phần bón được FERT_USES cây; cây được bón lớn nhanh gấp FERT_SPEED
 const FERT_USES = 2;

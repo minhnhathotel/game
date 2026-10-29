@@ -134,9 +134,30 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
   transform: translate(-50%, calc(-100% - 4px));
 }
 
+/* sói đêm: nằm trên lớp bóng tối, thân tự tối đi (--dim do game.js đặt) trừ khi đứng trong vùng sáng;
+   mắt luôn phát sáng nên nhìn thấy trong đêm */
+.wolf {
+  position: absolute; z-index: 960; width: 74px; height: 120px; padding: 0; border: none; background: none;
+  cursor: pointer; transform: translate(-50%, -100%);
+}
+.wolf[hidden] { display: none; }
+.wolf-body { display: block; width: 100%; height: 100%; }
+.wolf-body svg { display: block; width: 100%; height: 100%; overflow: visible; filter: url(#sketch) brightness(var(--dim, 1)); }
+.wolf.left .wolf-body svg { transform: scaleX(-1); }
+.wolf.walk .wolf-body { animation: trot .3s ease-in-out infinite alternate; }
+@keyframes trot { to { translate: 0 -3px; } }
+/* mắt phát sáng: chỉ hiện khi trời tối (--glow do game.js đặt theo độ tối) */
+.wolf-eye {
+  position: absolute; left: 72%; top: 20.5%; width: 5px; height: 4px; border-radius: 50%;
+  background: #ffe14a; box-shadow: 0 0 6px 3px rgba(255,220,80,.85); opacity: var(--glow, 0);
+}
+.wolf.left .wolf-eye { left: 22%; }
+.wolf.hurt .wolf-body { animation: hurt .35s ease; }
+@keyframes hurt { 25% { translate: -5px 0; filter: brightness(1.6) sepia(1) hue-rotate(-30deg) saturate(4); } 75% { translate: 5px 0; } }
+
 /* đêm tối: chỉ sáng quanh lửa trại, đuốc, cửa sổ bếp & quanh thỏ (vị trí đèn do game.js đặt) */
 .night {
-  position: absolute; inset: 0; z-index: 94; pointer-events: none; opacity: 0;
+  position: absolute; inset: 0; z-index: 900; pointer-events: none; opacity: 0;
   background: #060816; transition: opacity 1.2s;
   -webkit-mask-composite: source-in; mask-composite: intersect;
 }
@@ -180,9 +201,16 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
   transform-origin: 0 0; overflow: hidden; isolation: isolate;
   background: var(--grain), #8b8954;
 }
-#forest { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+/* Thứ tự tầng trên bản đồ (khung .stage không tạo lớp riêng nên mọi thứ xếp chung một hệ):
+   3 mặt đất (đường, ao, đất trồng) < 4 rừng mở rộng < 5…~150 cây/nhà/đồ vật/thỏ xếp theo chân (footZ)
+   < 700 lá rơi, đom đóm < 800 cây rừng che thỏ < 900 màn đêm < 950 viền tối < 960 sói */
+#forest { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+/* rừng mở rộng đã vẽ sẵn thành ảnh */
+.forest-img { position: absolute; left: 0; top: 0; display: block; pointer-events: none; user-select: none; }
+/* cây rừng đứng trước thỏ (gần người xem hơn): vẽ đè lên thỏ khi thỏ đi trong rừng */
+#forestFront { position: absolute; inset: 0; z-index: 800; pointer-events: none; }
 .stage {
-  position: absolute; width: 960px; height: 960px; z-index: 2;
+  position: absolute; width: 960px; height: 960px;
   /* các mảng cỏ đậm nhạt */
   background:
     radial-gradient(ellipse 170px 80px at 300px 600px, #7d7b48 98%, transparent 100%),
@@ -192,7 +220,7 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
 }
 /* viền tối quanh mép như ánh sáng chạng vạng */
 .world::after {
-  content: ''; position: absolute; inset: 0; z-index: 95; pointer-events: none;
+  content: ''; position: absolute; inset: 0; z-index: 950; pointer-events: none;
   background: radial-gradient(ellipse at 50% 48%, transparent 52%, rgba(20,12,6,.6) 100%);
 }
 .paths { position: absolute; left: 0; top: 0; width: 960px; height: 960px; z-index: 3; pointer-events: none; overflow: visible; }
@@ -210,6 +238,7 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
 
 .decor { position: absolute; pointer-events: none; }
 .decor svg { width: 100%; height: auto; display: block; overflow: visible; filter: url(#sketch); }
+.decor svg.pre-sketched { filter: none; }   /* ao, đuốc: nét run gắn bên trong, phần chuyển động để ngoài */
 
 .building {
   position: absolute; width: 210px; height: 191px; padding: 0; border: none; background: none;
@@ -219,7 +248,7 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
 .building:hover { transform: translateY(-5px) rotate(-1deg); filter: brightness(1.12); }
 .building:active { transform: translateY(-1px); }
 .building .bsvg, .building svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.building svg { filter: url(#sketch); }
+.building svg { filter: none; }   /* nét run đã gắn bên trong hình (sketchStatic) */
 /* nét mực đậm cho các khối của ngôi nhà */
 .bsvg svg :is(polygon, rect, circle, ellipse, path):not([stroke]):not(.sh):not(.smoke *) {
   stroke: var(--ink); stroke-width: 3; stroke-linejoin: round;
@@ -257,6 +286,9 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
 }
 .custom.med { margin-top: 14px; }
 #deathModal { z-index: 130; }
+#installHelp { z-index: 140; }
+.install-steps { padding-left: 20px; line-height: 1.5; }
+.install-steps li { margin-bottom: 6px; }
 .modal-box.death .btn.ghost { margin-right: 8px; }
 
 /* ---------- Sổ những lần ra đi: cuốn sổ bìa da mở 2 trang ---------- */
@@ -333,7 +365,7 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
 .fireglow { opacity: .22; animation: glowp 1.6s ease-in-out infinite; }
 @keyframes glowp { 50% { opacity: .34; } }
 .leaf {
-  position: absolute; top: -20px; width: 11px; height: 8px; z-index: 90; pointer-events: none;
+  position: absolute; top: -20px; width: 11px; height: 8px; z-index: 700; pointer-events: none;
   background: #b08a3c; border: 1.5px solid var(--ink); border-radius: 80% 0 80% 0;
   animation: fall 12s linear infinite;
 }
@@ -344,7 +376,7 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
   100% { translate: -20px 900px; rotate: 440deg; opacity: 0; }
 }
 .firefly {
-  position: absolute; width: 5px; height: 5px; border-radius: 50%; z-index: 92; pointer-events: none;
+  position: absolute; width: 5px; height: 5px; border-radius: 50%; z-index: 710; pointer-events: none;
   background: #ffe58a; box-shadow: 0 0 8px 3px rgba(255,220,120,.7);
   animation: firefly 6s ease-in-out infinite;
 }
@@ -357,7 +389,7 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
 
 /* ---------- Luống trồng (đất xới, đặt theo lưới trên bản đồ) ---------- */
 /* lớp phủ cả bản đồ, nằm sát mặt đất (trên đường đi, dưới cây cối & nhà) */
-.field { position: absolute; left: 0; top: 0; width: 960px; height: 960px; z-index: 4; pointer-events: none; }
+.field { position: absolute; left: 0; top: 0; width: 960px; height: 960px; z-index: 3; pointer-events: none; }
 .garden-wrap, .garden, #weeds, #placer { position: absolute; inset: 0; }
 /* mỗi ô = 1 mảnh đất xới, không rào; vị trí do cellRect() trong game.js đặt */
 .plot {
@@ -374,13 +406,13 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
 .plot:active { transform: translateY(2px); }
 /* sắp chết khô: đất nhạt màu nứt nẻ, cây ủ rũ */
 .plot.thirsty { background: repeating-linear-gradient(0deg, #8a6a4a 0 4px, transparent 4px 14px), #a08058; }
-.plot.thirsty .plant svg { filter: url(#sketch) saturate(.55) brightness(.95); rotate: 4deg; transform-origin: 50% 90%; }
+.plot.thirsty .plant svg { filter: saturate(.55) brightness(.95); rotate: 4deg; transform-origin: 50% 90%; }
 .plot.thirsty .badge { animation: bounce .8s ease-in-out infinite; }
 /* chết khô: cây nâu héo gục xuống */
 .plot.dead { background: repeating-linear-gradient(0deg, #8a6a4a 0 4px, transparent 4px 14px), #9a7a52; }
-.plot.dead .plant svg { filter: url(#sketch) sepia(1) saturate(.5) brightness(.7); rotate: 12deg; transform-origin: 50% 90%; }
+.plot.dead .plant svg { filter: sepia(1) saturate(.5) brightness(.7); rotate: 12deg; transform-origin: 50% 90%; }
 /* đột biến: cây đổi màu lạ, phát sáng nhấp nháy */
-.plot.mutant .plant svg { filter: url(#sketch) hue-rotate(150deg) saturate(1.8) drop-shadow(0 0 5px #c8f070); animation: glowp 1.4s ease-in-out infinite; }
+.plot.mutant .plant svg { filter: hue-rotate(150deg) saturate(1.8) drop-shadow(0 0 5px #c8f070); animation: glowp 1.4s ease-in-out infinite; }
 .cico.mutant svg { filter: hue-rotate(150deg) saturate(1.8) drop-shadow(0 0 3px #c8f070); }
 .inv-slot .cico.mutant svg { filter: url(#sketch) hue-rotate(150deg) saturate(1.8) drop-shadow(0 0 3px #c8f070); }
 
@@ -388,7 +420,7 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
 .bunny { transition: left .45s ease, top .45s ease, scale .6s ease; transform-origin: 50% 100%; }
 .bunny.morph-big { scale: 1.7; }
 .bunny.morph-small { scale: .5; }
-.morph-color svg { filter: url(#sketch) sepia(1) saturate(4) hue-rotate(var(--hue, 0deg)); }
+.morph-color svg { filter: sepia(1) saturate(4) hue-rotate(var(--hue, 0deg)); }
 .morph-ghost svg { opacity: .4; }
 .morph-flip > svg { rotate: 180deg; }
 
@@ -403,7 +435,7 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
   width: 100%; height: 125%; display: grid; place-items: center;
   transform: translateY(-24%); transform-origin: 50% 100%;
 }
-.plot .plant svg { width: 100%; height: 100%; overflow: visible; filter: url(#sketch); }
+.plot .plant svg { width: 100%; height: 100%; overflow: visible; will-change: transform; }
 /* hiệu ứng mỗi lần cây lên giai đoạn mới */
 .plot .plant.grow svg { animation: grow .55s cubic-bezier(.3,1.6,.5,1); transform-origin: 50% 90%; }
 @keyframes grow { 0% { scale: .4 .2; } 60% { scale: 1.1 1.15; } 100% { scale: 1 1; } }
@@ -430,12 +462,12 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
   display: none; position: absolute; left: 30%; top: 18%; width: 48%; z-index: 3; pointer-events: none;
   transform: rotateX(calc(var(--tilt) * -1)); transform-origin: 50% 100%;
 }
-.plot .bug svg { width: 100%; height: auto; overflow: visible; filter: url(#sketch); animation: crawl 1.4s ease-in-out infinite alternate; }
+.plot .bug svg { width: 100%; height: auto; overflow: visible; will-change: transform; animation: crawl 1.4s ease-in-out infinite alternate; }
 @keyframes crawl { from { translate: -14% 0; scale: 1 1; } 50% { scale: 1.12 .9; } to { translate: 14% -6%; scale: 1 1; } }
 .plot.has-bug .bug { display: block; }
 .plot.has-bug { border-color: #b8332e; animation: alarm 1s ease-in-out infinite; }
 @keyframes alarm { 50% { box-shadow: var(--frame), 0 7px 0 #4a3624, 0 7px 0 3px var(--ink), 0 0 0 6px rgba(184,51,46,.7); } }
-.plot.has-bug .plant svg { filter: url(#sketch) saturate(.6) brightness(.85); }
+.plot.has-bug .plant svg { filter: saturate(.6) brightness(.85); }
 /* bị trộm: ô đất lóe tối */
 .plot.stolen { animation: stolen 1.2s ease-out; }
 @keyframes stolen { 0% { filter: brightness(.3); } 100% { filter: none; } }
@@ -462,12 +494,12 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
 .hand-torch .fireglow { opacity: .35; }
 .bunny.hop svg { animation: hop .45s ease var(--hops, 1); }
 @keyframes hop { 0%,100% { translate: 0 0; } 50% { translate: 0 -24px; } }
-.bunny svg, .portrait svg, .chef svg { width: 100%; height: 100%; overflow: visible; filter: url(#sketch); }
+.bunny svg, .portrait svg, .chef svg { width: 100%; height: 100%; overflow: visible; will-change: transform; }
 .bunny svg { animation: breathe 2.4s ease-in-out infinite; }
 @keyframes breathe { 50% { scale: 1.03 .97; } }
 .blink { transform-box: fill-box; transform-origin: center; animation: blink 4s infinite; }
 @keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
-.stomach svg { filter: url(#sketch) hue-rotate(70deg) saturate(.7); }
+.stomach svg { filter: hue-rotate(70deg) saturate(.7); }
 .stomach::after { content: '🤢'; position: absolute; top: -6px; right: -10px; font-size: 1.4rem; }
 /* trúng độc: đầu & tai thỏ xanh dần theo mức bệnh */
 .fur { transition: fill .6s; }
@@ -601,6 +633,19 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
   animation: toast 2.6s forwards;
 }
 @keyframes toast { 0% { opacity: 0; translate: 0 10px; } 10%,80% { opacity: 1; translate: 0 0; } 100% { opacity: 0; } }
+/* khung thông báo lặt vặt bên phải, dưới các đồng hồ */
+#feed {
+  position: fixed; top: 100px; right: 12px; z-index: 120; width: min(280px, 60vw); pointer-events: none;
+  display: flex; flex-direction: column; gap: 4px; align-items: flex-end;
+}
+.note {
+  max-width: 100%; padding: 4px 10px; font-size: .92rem; line-height: 1.25; color: #f4efe4;
+  background: var(--grain), rgba(43,33,24,.9); border: 2px solid var(--ink); border-radius: 8px 4px 9px 5px;
+  box-shadow: 2px 3px 0 rgba(0,0,0,.45); animation: note 4s forwards;
+}
+@keyframes note { 0% { opacity: 0; translate: 14px 0; } 8%, 85% { opacity: 1; translate: 0 0; } 100% { opacity: 0; } }
+/* thỏ đang đuổi sói: nhảy liên tục */
+.bunny.run svg { animation: hop .3s ease infinite; }
 
 @media (max-width: 600px) {
   .modal-box.wide { padding: 0 14px 14px; }
@@ -612,6 +657,7 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
   .meter.level b { font-size: 1.2rem; }
   .hud-tr { gap: 4px; right: 6px; }
   .hud-tl { top: 70px; left: 6px; }
+  #feed { top: 130px; right: 6px; }
   .portrait { width: 50px; height: 50px; }
   .coins { font-size: 1rem; }
   .coins .coin-ico { width: 24px; height: 24px; }
@@ -620,3 +666,34 @@ h2 { font-size: 1.35rem; margin: 22px 0 10px; color: var(--red); }
   .inv-slot { width: 38px; height: 38px; }
   .inv-slot .cico, .inv-slot > span { width: 28px; height: 28px; }
 }
+
+/* ---------- Ao sen ---------- */
+.lotus {
+  position: absolute; width: 62px; height: 62px; translate: -50% -50%; z-index: 15;
+  padding: 0; border: none; background: none; cursor: pointer; display: grid; place-items: center;
+  transition: scale .15s;
+}
+.lotus:hover { scale: 1.12; }
+.lotus svg { width: 100%; height: 100%; overflow: visible; will-change: transform; }
+.lotus.grow svg { animation: grow .55s cubic-bezier(.3,1.6,.5,1); transform-origin: 50% 80%; }
+.lotus.ripe svg { animation: lotusbob 2s ease-in-out infinite; }
+@keyframes lotusbob { 0%,100% { translate: 0 0; } 50% { translate: 0 -3px; } }
+.lotus-empty {
+  width: 42px; height: 22px; display: grid; place-items: center; font-size: 1.2rem; color: rgba(230,240,245,.8);
+  border: 2px dashed rgba(220,240,245,.6); border-radius: 50%;
+}
+/* thỏ lội xuống ao: chìm nửa người, bơi nhấp nhô, gợn nước quanh người */
+.bunny.swim svg { clip-path: inset(0 0 42% 0); translate: 0 30%; animation: swim 1.3s ease-in-out infinite; }
+@keyframes swim { 0%,100% { translate: 0 30%; rotate: -4deg; } 50% { translate: 0 35%; rotate: 4deg; } }
+.bunny.swim::before {
+  content: ''; position: absolute; left: -18%; right: -18%; top: 78%; height: 16px; pointer-events: none;
+  border: 2.5px solid rgba(220,240,245,.8); border-radius: 50%;
+  animation: ripple 1.6s ease-out infinite;
+}
+@keyframes ripple { from { scale: .7; opacity: 1; } to { scale: 1.35; opacity: 0; } }
+.bunny.swim .hand-torch { display: none; }
+
+/* ---------- Đồ hái lượm (bụi quả, hoa, cỏ, cây non, tảng đá, khúc gỗ) ---------- */
+.forage { position: absolute; padding: 0; border: none; background: none; cursor: pointer; }
+.forage svg { display: block; width: 100%; height: auto; overflow: visible; filter: url(#sketch); }
+.forage:hover svg { filter: url(#sketch) brightness(1.2); }

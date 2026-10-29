@@ -542,6 +542,8 @@ const DECOR = [
 const FLOWERS = [
   [380, 230, 0], [552, 236, 1], [720, 470, 2], [660, 470, 3], [566, 700, 2],
 ];
+// đồ hái lượm: không vẽ cố định ở đây mà do game.js quản lý (hái xong mọc lại chỗ khác)
+const FORAGE_KINDS = ['berry', 'flower', 'grass', 'sapling', 'boulder', 'log'];
 const DRAW = {
   pine: () => pineSVG(Math.floor(rnd(0, 3))), birch: (v) => birchSVG(v ?? Math.floor(rnd(0, 3))),
   berry: berrySVG, grass: grassSVG, sapling: saplingSVG, boulder: boulderSVG,
@@ -549,27 +551,123 @@ const DRAW = {
   barrel: barrelSVG, crate: crateSVG, woodpile: woodpileSVG, log: logSVG, mushroom: mushroomSVG,
 };
 
-// Rừng lấp kín phần màn hình ngoài khung 960×960 (vẽ chung trong 1 SVG để nhẹ máy)
-function renderForest(W, H, ox, oy) {
-  seed = 97;
+// Rừng mở rộng phủ phần màn hình ngoài khung bản đồ 960. Cây đặt theo lưới cố định tính từ góc khung 960
+// (ô i, j → id "o{i}_{j}"), nên đổi cỡ màn hình cây vẫn ở chỗ cũ và chặt/lát đường được lưu lại.
+// Để nhẹ máy: cả rừng được vẽ sẵn 1 lần thành ảnh (kèm nét run tay); chỉ vài cây đang che thỏ là vẽ trực tiếp đè lên.
+const cellRnd = (i, j, k) => { const v = Math.sin(i * 127.1 + j * 311.7 + k * 74.7) * 43758.5453; return v - Math.floor(v); };
+const SKETCH_FILTER = `<filter id="sketch" x="-5%" y="-5%" width="110%" height="110%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="4" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="3.2" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>`;
+let forestTrees = [];   // cây rừng xếp theo chân cây; toạ độ x, y, foot là toạ độ #world
+let forestW = 0, forestH = 0, forestUrl = null, lastFrontBox = null;
+// s: 'up' (cây đứng) | 'stump' (gốc vừa chặt)
+function outerTreeSVG(t, s) {
+  const art = s === 'stump' ? stumpSVG(t.kind === 'birch' ? 125 : 170) : t.kind === 'pine' ? pineSVG(t.v) : birchSVG(t.v);
+  return art.replace('<svg ', `<svg x="${t.x}" y="${t.y}" width="${t.w}" height="${t.w * 1.7}" preserveAspectRatio="xMidYMax meet" `);
+}
+const treesSVG = (list) => list.map((t) => (t.s === 'gone' ? '' : outerTreeSVG(t, t.s))).join('');
+// treeState(id) → 'up' | 'stump' | 'gone' (đã đào gốc lát đường)
+function renderForest(W, H, ox, oy, treeState) {
   const trees = [];
-  for (let y = -90; y < H; y += 64) {
-    for (let x = -50; x < W; x += 62) {
-      const tx = x + rnd(-14, 14), ty = y + rnd(-12, 12);
-      const inside = tx > ox - 30 && tx < ox + 900 && ty > oy - 60 && ty < oy + 860;
-      const w = rnd(80, 110), kind = pick();
-      // khung cây cao w × 1.7, cây vẽ sát đáy khung; toạ độ ao tính theo khung bản đồ 960
-      if (!inside && !treeInPond(tx + w / 2 - ox, ty - oy, w * 1.7)) trees.push([tx, ty, w, kind]);
+  for (let j = Math.floor((-oy - 90) / 64); j * 64 < H - oy; j++) {
+    for (let i = Math.floor((-ox - 50) / 62); i * 62 < W - ox; i++) {
+      const sx = i * 62 + (cellRnd(i, j, 1) - 0.5) * 28, sy = j * 64 + (cellRnd(i, j, 2) - 0.5) * 24;   // toạ độ khung 960
+      const w = 80 + cellRnd(i, j, 3) * 30;
+      // trong khung bản đồ đã có cây riêng; khung cây cao w × 1.7, cây vẽ sát đáy khung
+      if ((sx > -30 && sx < 900 && sy > -60 && sy < 860) || treeInPond(sx + w / 2, sy, w * 1.7)) continue;
+      // càng xa khu bản đồ chính rừng càng thưa (bớt tối đa 45% số cây) cho nhẹ máy trên màn hình rất to
+      const far = Math.hypot(Math.max(0, -30 - sx, sx - 900), Math.max(0, -60 - sy, sy - 860));
+      if (far > 420 && cellRnd(i, j, 6) < Math.min(0.45, (far - 420) / 900)) continue;
+      trees.push({
+        id: `o${i}_${j}`, x: sx + ox, y: sy + oy, w, foot: sy + oy + w * 1.7,
+        kind: cellRnd(i, j, 4) < 0.78 ? 'pine' : 'birch', v: Math.floor(cellRnd(i, j, 5) * 3),
+      });
     }
   }
-  trees.sort((a, b) => a[1] - b[1]);
-  const svg = trees.map(([x, y, w, t]) =>
-    (t === 'pine' ? pineSVG(Math.floor(rnd(0, 3))) : birchSVG(Math.floor(rnd(0, 3))))
-      .replace('<svg ', `<svg x="${x}" y="${y}" width="${w}" height="${w * 1.7}" preserveAspectRatio="xMidYMax meet" `)).join('');
-  document.getElementById('forest').innerHTML =
-    `<svg width="${W}" height="${H}" style="position:absolute;left:0;top:0;overflow:visible"><g filter="url(#sketch)">${svg}</g></svg>`;
+  trees.sort((a, b) => a.foot - b.foot);
+  trees.forEach((t) => { t.s = treeState(t.id); });
+  forestTrees = trees;
+  forestW = W;
+  forestH = H;
+  document.getElementById('forestFront').innerHTML =
+    `<svg width="${W}" height="${H}" style="position:absolute;left:0;top:0;overflow:visible"><g id="forestFrontG" filter="url(#sketch)"></g></svg>`;
+  forestFront = [];
+  bakeForest();
+}
+// vẽ cả rừng thành 1 ảnh: trình duyệt chỉ phải vẽ nét run tay 1 lần, sau đó dùng lại ảnh
+function bakeForest() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${forestW}" height="${forestH}" viewBox="0 0 ${forestW} ${forestH}">`
+    + `<defs>${SKETCH_FILTER}</defs><g filter="url(#sketch)">${treesSVG(forestTrees)}</g></svg>`;
+  const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+  const img = new Image(forestW, forestH);
+  img.className = 'forest-img';
+  img.alt = '';
+  img.onload = () => {
+    const box = document.getElementById('forest');
+    box.replaceChildren(img);
+    if (forestUrl) URL.revokeObjectURL(forestUrl);
+    forestUrl = url;
+  };
+  // trình duyệt không vẽ được ảnh thì quay về cách cũ: vẽ trực tiếp bằng SVG
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    document.getElementById('forest').innerHTML =
+      `<svg width="${forestW}" height="${forestH}" style="position:absolute;left:0;top:0;overflow:visible"><g filter="url(#sketch)">${treesSVG(forestTrees)}</g></svg>`;
+  };
+  img.src = url;
+}
+// cây rừng vừa đổi trạng thái (bị chặt, mọc lại, bị đào gốc) thì vẽ lại ảnh rừng
+let bakeTimer = null;
+function refreshForest(treeState) {
+  let changed = false;
+  for (const t of forestTrees) {
+    const s = treeState(t.id);
+    if (s !== t.s) { t.s = s; changed = true; }
+  }
+  if (!changed) return;
+  clearTimeout(bakeTimer);
+  bakeTimer = setTimeout(bakeForest, 60);
+  forestFront = [];
+  setForestFront(lastFrontBox);
+}
+// Chỉ những cây đang thật sự che thỏ (tán chồng lên người thỏ & gốc đứng trước thỏ) mới được vẽ đè lên thỏ.
+// box = khung thỏ theo toạ độ #world, hoặc null khi thỏ ở giữa bản đồ (không cây rừng nào che)
+let forestFront = [];   // chỉ số (trong forestTrees) các cây đang vẽ đè lên thỏ
+function setForestFront(box) {
+  lastFrontBox = box;
+  const next = [];
+  if (box) {
+    forestTrees.forEach((t, i) => {
+      if (t.s === 'gone' || t.foot <= box.y + box.h) return;
+      const top = t.s === 'stump' ? t.foot - t.w * 0.5 : t.y + t.w * 0.15;
+      if (t.x + t.w * 0.12 < box.x + box.w && box.x < t.x + t.w * 0.88 && top < box.y + box.h) next.push(i);
+    });
+  }
+  if (next.join() === forestFront.join()) return;
+  forestFront = next;
+  const front = document.getElementById('forestFrontG');
+  if (front) front.innerHTML = treesSVG(next.map((i) => forestTrees[i]));
 }
 
+// Bộ lọc nét run tay chỉ áp lên phần đứng yên của hình; phần chuyển động (khói, lửa, bóng cá, mắt chớp…)
+// để ngoài bộ lọc, nhờ vậy trình duyệt không phải vẽ lại nét run mỗi khung hình
+const ANIMATED = '.smoke, .flamewrap, .flame, .fireglow, .fishshadow, .blink, .ash';
+function sketchStatic(svg) {
+  if (!svg || svg.classList.contains('pre-sketched')) return svg;
+  svg.classList.add('pre-sketched');
+  let g = null;
+  for (const n of [...svg.children]) {
+    if (n.tagName === 'defs' || n.matches(ANIMATED)) { g = null; continue; }
+    if (!g) {
+      g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('filter', 'url(#sketch)');
+      svg.insertBefore(g, n);
+    }
+    g.appendChild(n);
+  }
+  return svg;
+}
 function renderScene() {
   document.body.insertAdjacentHTML('afterbegin', SCENE_DEFS);
   document.querySelector('#b-kitchen .bsvg').innerHTML = kitchenSVG();
@@ -585,9 +683,9 @@ function renderScene() {
       style="left:${x}px; top:${y}px; width:${w}px; z-index:${z}">${DRAW[t](v)}</div>`;
   const items = FRAME.map((d, k) => item(d, frameZ(d), 'f' + k))
     // ao nằm sát mặt đất (dưới cầu câu & cây cối)
-    .concat(DECOR.map((d, k) => item(d, d[0] === 'pond' ? 3 : 20 + Math.round(d[2] / 10), 'd' + k)));
-  const flowers = FLOWERS.map(([x, y, v]) =>
-    `<div class="decor" data-kind="flower" style="left:${x}px; top:${y}px; width:16px; z-index:${20 + Math.round(y / 10)}">${flowerSVG(v)}</div>`);
+    // giữ chỉ số k gốc để id cây ('d' + k) không đổi; đồ hái lượm do game.js vẽ ở #forage
+    .concat(DECOR.map((d, k) => (FORAGE_KINDS.includes(d[0]) ? '' : item(d, d[0] === 'pond' ? 3 : 20 + Math.round(d[2] / 10), 'd' + k))));
+  const flowers = [];
   // lá rơi & đom đóm
   const leaves = Array.from({ length: 12 }, (_, i) =>
     `<span class="leaf" style="left:${(i * 83) % 960}px; animation-delay:${(i * 1.7) % 14}s; animation-duration:${11 + (i % 4) * 2}s"></span>`);
@@ -595,4 +693,25 @@ function renderScene() {
     `<span class="firefly" style="left:${120 + ((i * 97) % 720)}px; top:${260 + ((i * 53) % 560)}px; animation-delay:${i * .8}s"></span>`);
   document.getElementById('decor').innerHTML = items.join('') + flowers.join('') + leaves.join('') + flies.join('');
   renderPebbles();
+  // nhà cửa (khói bếp, lửa trại) & đồ trang trí có phần chuyển động (bóng cá dưới ao, lửa đuốc)
+  document.querySelectorAll('.building .bsvg > svg').forEach(sketchStatic);
+  document.querySelectorAll('#decor svg').forEach((s) => { if (s.querySelector(ANIMATED)) sketchStatic(s); });
+  // xếp lớp theo chân (đáy) của từng vật, giống cách xếp thỏ: chân thấp hơn (gần người xem hơn) thì vẽ đè lên
+  document.querySelectorAll('#decor .decor').forEach((el) => {
+    if (el.dataset.kind !== 'pond') el.style.zIndex = footZ(el.offsetTop + el.offsetHeight);
+  });
+  // cầu câu nằm sát mặt nước, thỏ đứng trên cầu luôn ở trên
+  document.querySelectorAll('.building:not(.dock)').forEach((el) => { el.style.zIndex = footZ(el.offsetTop + el.offsetHeight); });
+}
+// thứ tự lớp theo vị trí chân y (toạ độ khung 960); dùng chung cho đồ vật, nhà, nấm & thỏ
+const footZ = (y) => Math.max(5, 20 + Math.round(y / 10));
+// hình & tỉ lệ cao/rộng của đồ hái lượm
+const forageArt = (kind, v) => (kind === 'flower' ? flowerSVG(v || 0) : DRAW[kind](v));
+const artRatioCache = {};
+function artRatio(kind) {
+  if (!artRatioCache[kind]) {
+    const m = forageArt(kind, 0).match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
+    artRatioCache[kind] = m ? +m[2] / +m[1] : 1;
+  }
+  return artRatioCache[kind];
 }

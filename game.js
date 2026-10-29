@@ -23,7 +23,27 @@ const cellTilt = (c, r) => ((((c * 17 + r * 31) % 7) + 7) % 7 - 3) * 0.8;
 // tắt game quá 16 tiếng thì lửa trại tắt
 const OFFLINE_FIRE_MS = 16 * 3600 * 1000;
 const MAX_STOVES = 4;
-const COST = { plant: 2, water: 1, harvest: 1, bug: 1, chop: 3, fish: 2, pick: 1 };
+const COST = { plant: 2, water: 1, harvest: 1, bug: 1, chop: 3, fish: 2, pick: 1, pave: 1 };
+// Đồ hái lượm trên bản đồ: hái xong thì biến mất, regrow mili giây sau mọc lại ở 1 chỗ trống ngẫu nhiên.
+// give/n = thu được gì, bao nhiêu; wood = được củi; cost = năng lượng (mặc định COST.pick); w = cỡ khi mọc mới
+const FORAGE = {
+  berry:   { give: 'quamong', n: 3, w: 66, regrow: 60000, title: 'Bụi quả mọng dại — bấm để hái quả' },
+  flower:  { give: 'hoadai',  n: 1, w: 16, regrow: 40000, title: 'Hoa dại — bấm để hái' },
+  grass:   { give: 'cokho',   n: 2, w: 36, regrow: 40000, title: 'Cỏ dại — bấm để cắt' },
+  sapling: { give: 'canhcay', n: 2, w: 26, regrow: 50000, title: 'Cây non — bấm để bẻ cành' },
+  boulder: { give: 'dacuoi',  n: 2, w: 52, regrow: 90000, cost: 2, title: 'Tảng đá — bấm để nhặt đá cuội' },
+  log:     { wood: 2,               w: 62, regrow: 120000, cost: 2, title: 'Khúc gỗ mục — bấm để lấy củi' },
+};
+// lần đầu chơi: lấy đúng các bụi cây, hoa, đá… đang vẽ sẵn trên bản đồ
+function initialForage() {
+  const list = [];
+  DECOR.forEach(([kind, x, y, w, v], i) => { if (FORAGE[kind]) list.push({ id: 'f' + i, kind, x, y, w, v }); });
+  FLOWERS.forEach(([x, y, v], i) => list.push({ id: 'fl' + i, kind: 'flower', x, y, w: 16, v }));
+  return list;
+}
+// ô trồng sen dưới ao (tâm ô, toạ độ bản đồ): chỗ nước trống cạnh cầu câu
+const LOTUS_POS = [[700, 785], [790, 770], [862, 700]];
+const emptyLotus = () => ({ crop: null, growth: 0 });
 // Nấm dại: cứ 40 giây mọc thêm 1 cụm ở các chỗ dưới đây (tối đa 5 cụm), 30% cụm là nấm độc
 const WILD_MS = 40000;
 const WILD_MAX = 5;
@@ -72,11 +92,13 @@ function newState() {
     seeds: { muong: 4, hanh: 2, cai: 2, ngaicuu: 2, tiato: 2 },
     produce: {}, dishes: {}, custom: [],
     plots: Array.from({ length: 8 }, (_, i) => ({ ...emptyPlot(), c: i % 4, r: Math.floor(i / 4) })),
+    lotus: LOTUS_POS.map(emptyLotus),
     stoves: [null, null],
     fire: { fuel: FIRE_MAX, outMs: 0 }, wood: 3,
     orders: [], ordersDone: 0,
     toxic: {}, wild: {}, wildAcc: WILD_MS * 3,
     ills: {}, trees: {}, treesV: 7, axe: null, rod: null, landPaid: false, fert: 0,
+    roads: {}, paving: 0, forage: initialForage(), forageWait: [], forageN: 0,
     born: Date.now(), last: Date.now(),
   };
 }
@@ -109,6 +131,10 @@ function load() {
       if (s.axe === undefined) s.axe = null;
       if (s.rod === undefined) s.rod = null;
       s.fert = s.fert || 0;
+      s.roads = s.roads || {};
+      s.paving = s.paving || 0;
+      if (!s.forage) { s.forage = initialForage(); s.forageWait = []; s.forageN = 0; }
+      s.lotus = s.lotus || LOTUS_POS.map(emptyLotus);
       s.born = s.born || s.last;
       s.landPaid = !!s.landPaid;
       // bản lưu cũ chưa có bệnh tật: tặng hạt cây thuốc để kịp trồng
@@ -173,6 +199,10 @@ function simulate(now, offline = false) {
       toast(`🐛 Có ${CATCH[p.pest].name.toLowerCase()} bám vào cây ${CROPS[p.crop].name}! Bắt nhanh lên.`);
     }
   }
+  // sen sống dưới nước nên luôn lớn, không cần tưới
+  for (const p of state.lotus) {
+    if (p.crop) p.growth = Math.min(CROPS[p.crop].days * DAY_MS, p.growth + dt);
+  }
   burnFire(from, now, offline);
   // cây bị chặt trên đất chưa mua tự mọc lại
   for (const t of Object.values(state.trees)) {
@@ -181,6 +211,8 @@ function simulate(now, offline = false) {
   // nấm dại tự mọc dần (kể cả lúc tắt game, nhưng không quá số cụm tối đa)
   state.wildAcc = Math.min(WILD_MS * WILD_MAX, state.wildAcc + dt);
   while (state.wildAcc >= WILD_MS) { state.wildAcc -= WILD_MS; spawnWild(); }
+  // đồ hái lượm đến lúc mọc lại (không tìm được chỗ trống thì để lần sau thử lại)
+  state.forageWait = state.forageWait.filter((f) => now < f.at || !spawnForage(f.kind));
   // bệnh đếm ngược tới lúc chết; lúc tắt game vẫn chừa ít nhất 60 giây để kịp nấu thuốc
   for (const [k, ill] of Object.entries(state.ills)) {
     ill.left = offline ? Math.max(Math.min(ill.left, 60000), ill.left - dt) : ill.left - dt;
@@ -304,11 +336,24 @@ function toast(msg, important = false) {
   while (box.children.length > (important ? 4 : 6)) box.firstChild.remove();
   setTimeout(() => el.remove(), important ? 2600 : 4000);
 }
-// lời thoại bám theo đầu thỏ
+// lời thoại bám theo đầu thỏ; đồng thời xếp lớp thỏ với cây cối để thỏ đi được dưới tán cây
+let lastDepth = null;
 function followBunny() {
-  const r = $('#bunny').getBoundingClientRect(), s = $('#speech');
+  const b = $('#bunny');
+  const r = b.getBoundingClientRect(), s = $('#speech');
   s.style.left = r.left + r.width / 2 + 'px';
   s.style.top = r.top + 'px';
+  // đồ vật trong bản đồ xếp lớp theo chân (footZ); thỏ cũng vậy, cùng chân thì thỏ ở trên
+  const foot = b.offsetTop + b.offsetHeight;
+  b.style.zIndex = Math.max(16, footZ(foot));
+  // rừng mở rộng: chỉ khi thỏ đã ra hẳn ngoài khung bản đồ chính mới cần vẽ cây rừng đè lên thỏ
+  // (ở dải cây viền thì cây viền tự che thỏ theo footZ, không kéo cây rừng lên kẻo cây "mọc" ra đột ngột)
+  const inForest = b.offsetLeft < -20 || b.offsetLeft > 980 || foot < 0 || foot > 960;
+  const key = inForest ? Math.round(b.offsetLeft / 12) + ',' + Math.round(foot / 12) : 'clear';
+  if (key !== lastDepth) {
+    lastDepth = key;
+    setForestFront(inForest ? { x: b.offsetLeft - b.offsetWidth / 2 + stageOX, y: b.offsetTop + stageOY, w: b.offsetWidth, h: b.offsetHeight } : null);
+  }
   requestAnimationFrame(followBunny);
 }
 function useEnergy(n) {
@@ -435,6 +480,7 @@ const CAUSES = {
   mushroom: 'Ăn phải nấm độc',
   poison:  'Trúng độc',
   stomach: 'Đau bụng',
+  fish:    'Bị cá khổng lồ kéo xuống ao khi hái sen',
 };
 function loadDeaths() {
   try { return JSON.parse(localStorage.getItem(DEATH_KEY)) || []; } catch (e) { return []; }
@@ -478,6 +524,7 @@ function deathArtSVG(cause, level) {
         <path d="M0 24 Q0 0 22 0 Q44 0 44 24 Z" fill="#7a3f6e" ${ink(2.5)}/>
         <circle cx="12" cy="12" r="3" fill="#c9e08a"/><circle cx="30" cy="9" r="2.5" fill="#c9e08a"/><circle cx="34" cy="18" r="2" fill="#c9e08a"/>
         <path d="M18 34 l3 3 m0 -3 l-3 3 M24 34 l3 3 m0 -3 l-3 3" stroke="${K}" stroke-width="1.6"/></g>`;
+  culprit.fish = giantFishSVG().replace('<svg ', '<svg x="126" y="70" width="72" height="45" ');
   const art = culprit[cause] || culprit[cause === 'stomach' ? 'spoiled' : 'snake'];
   return `<svg viewBox="0 0 200 140" aria-hidden="true">
     <ellipse cx="100" cy="130" rx="94" ry="10" fill="#8a7a55" ${ink(2)}/>
@@ -633,16 +680,29 @@ function moveBunny(x, y) {
   if (chasing) stopChase();   // đi chỗ khác thì thôi đuổi sói
   const bunny = $('#bunny');
   // đi xa thì lâu hơn & nhảy nhiều bước hơn (mỗi bước 0,45 giây)
-  const secs = Math.min(1.8, Math.max(0.45, Math.hypot(x - bunny.offsetLeft, y - bunny.offsetTop) / 360));
+  const secs = Math.min(3, Math.max(0.45, Math.hypot(x - bunny.offsetLeft, y - bunny.offsetTop) / 360));
   bunny.style.transitionDuration = secs + 's';
   bunny.style.setProperty('--hops', Math.round(secs / 0.45));
   bunny.classList.toggle('flip', x < bunny.offsetLeft);
+  // chân thỏ ở dưới nước thì phải bơi; đổi dáng lúc tới gần mép nước
+  const wet = inWater(x, y + bunny.offsetHeight);
+  clearTimeout(moveBunny.swimT);
+  if (wet !== bunny.classList.contains('swim')) {
+    moveBunny.swimT = setTimeout(() => bunny.classList.toggle('swim', wet), secs * 1000 * (wet ? 0.7 : 0.3));
+  }
   bunny.style.left = x + 'px';
   bunny.style.top = y + 'px';
   bunny.classList.remove('hop');
   void bunny.offsetWidth;
   bunny.classList.add('hop');
   return secs * 1000;
+}
+// điểm (x, chân) nằm trong ao mà không đứng trên cầu câu
+function inWater(x, footY) {
+  const d = $('#b-pond');
+  const onDock = x > d.offsetLeft && x < d.offsetLeft + d.offsetWidth
+    && footY > d.offsetTop - 10 && footY < d.offsetTop + d.offsetHeight;
+  return !onDock && inPond(x, footY);
 }
 // thỏ tới nơi rồi mới làm việc (hái, chặt, mở nhà, đánh sói…)
 function whenArrived(ms, fn) {
@@ -661,7 +721,8 @@ function rectInWorld(el) {
 
 // Phóng bản đồ vừa khít màn hình; phần thừa hai bên được lấp bằng rừng
 let worldScale = 1;
-let stageOX = 0, stageOY = 0;   // vị trí khung bản đồ 960 trong #world (để đặt đèn lúc đêm)
+let stageOX = 0, stageOY = 0;
+let worldW = 960, worldH = 960;   // kích thước cả vùng bản đồ đang hiện trên màn hình (gồm rừng mở rộng)   // vị trí khung bản đồ 960 trong #world (để đặt đèn lúc đêm)
 function layoutWorld() {
   const vp = $('.world-viewport');
   const vw = vp.clientWidth, vh = vp.clientHeight;
@@ -670,11 +731,15 @@ function layoutWorld() {
   const LEFT = 64, TOP = 10, BOTTOM = 66;
   // chỉ cần vừa khít vùng chính (nhà + ruộng), phần rừng viền ngoài được phép tràn ra mép → nhìn to hơn
   const CX = 480, CY = 500, CW = 900, CH = 860;
-  const s = Math.min((vw - LEFT) / CW, (vh - TOP - BOTTOM) / CH);
+  // màn to (27", 34"…) thì không phóng to thêm nữa mà mở rộng tầm nhìn: rừng trải ra lấp kín màn hình
+  const MAX_ZOOM = 1.2;
+  const s = Math.min((vw - LEFT) / CW, (vh - TOP - BOTTOM) / CH, MAX_ZOOM);
   const W = vw / s, H = vh / s;
   const ox = (LEFT + (vw - LEFT) / 2) / s - CX, oy = (TOP + (vh - TOP - BOTTOM) / 2) / s - CY;
   stageOX = ox;
   stageOY = oy;
+  worldW = W;
+  worldH = H;
   worldScale = s;
   const world = $('#world');
   world.style.width = W + 'px';
@@ -682,7 +747,8 @@ function layoutWorld() {
   world.style.transform = `scale(${s})`;
   $('#stage').style.left = ox + 'px';
   $('#stage').style.top = oy + 'px';
-  renderForest(W, H, ox, oy);
+  renderForest(W, H, ox, oy, treeStateOf);
+  lastDepth = null;
 }
 function hopTo(i) {
   const tile = $('#garden').children[i];
@@ -752,17 +818,38 @@ function axeText() {
   return state.axe.left >= 3 ? 'rìu còn tốt' : state.axe.left === 2 ? 'rìu đã mòn' : 'rìu sắp gãy';
 }
 
+// trạng thái hiển thị của 1 cây theo id (dùng cho cả cây rừng mở rộng)
+const treeStateOf = (id) => { const t = state.trees[id]; return !t ? 'up' : t.gone ? 'gone' : t.down ? 'stump' : 'up'; };
 function chopTree(el) {
-  const t = treeAt(el.dataset.tree);
+  chop(el.dataset.tree, treeHits(el), () => { el.classList.remove('chop'); void el.offsetWidth; el.classList.add('chop'); });
+}
+// cây rừng mở rộng (vẽ chung trong 1 SVG): tìm theo id vì đổi cỡ màn hình thì phần tử được vẽ lại
+function chopOuter(id) {
+  const ft = forestTrees.find((t) => t.id === id);
+  if (ft) chop(id, ft.w >= 100 ? 4 : 3, () => {});
+}
+// cây rừng mở rộng ở điểm (x, y) toạ độ khung 960 (chọn cây gần người xem nhất nếu chồng nhau)
+function outerTreeAt(x, y) {
+  const wx = x + stageOX, wy = y + stageOY;
+  let best = null;
+  for (const t of forestTrees) {
+    if (t.s === 'gone') continue;
+    const top = t.s === 'stump' ? t.foot - t.w * 0.5 : t.y + t.w * 0.3;
+    if (wx > t.x + t.w * 0.2 && wx < t.x + t.w * 0.8 && wy > top && wy < t.foot && (!best || t.foot > best.foot)) best = t;
+  }
+  return best;
+}
+function chop(id, need, shake) {
+  const t = treeAt(id);
   if (t.gone) return;
-  if (t.down) return toast(`🌱 Gốc cây đang đâm chồi — ${fmtSec(t.down - Date.now())} nữa sẽ mọc lại`);
+  if (t.down) return toast(`🌱 Gốc cây đang đâm chồi — ${fmtSec(t.down - Date.now())} nữa sẽ mọc lại. Chuột phải vào đây để lát đường!`);
   if (!state.axe) return toast('🪓 Cần có rìu mới chặt được cây! Mua rìu ở Cửa hàng.');
   if (!useEnergy(COST.chop)) return;
   t.hits++;
-  el.classList.remove('chop'); void el.offsetWidth; el.classList.add('chop');
+  shake();
   if (Math.random() < SNAKE_RATE) getSick('poison', '🐍 Có rắn trong gốc cây — thỏ bị rắn cắn!', 'snake');
-  if (t.hits < treeHits(el)) {
-    toast(`🪓 Cộc! (${t.hits}/${treeHits(el)} nhát)`);
+  if (t.hits < need) {
+    toast(`🪓 Cộc! (${t.hits}/${need} nhát)`);
     return renderAll();
   }
   t.hits = 0;
@@ -799,6 +886,102 @@ function renderTrees() {
   return changed;
 }
 
+// ---------- Lát đường ----------
+// chuột phải vào chỗ đất: thỏ chạy tới lát đường ở đó. Phải lát nối tiếp từ đường chính
+// (đường mòn, quảng trường, sân trước nhà) hoặc từ đoạn đã lát. Cây đang đứng (kể cả cây rừng mở rộng)
+// thì phải chặt trước; gặp gốc cây thì đào luôn, cây không mọc lại.
+// Đường lát vẽ chung lớp & cùng kiểu với đường mòn (#roadEdge/#roadDirt) nên các đoạn nối liền vào nhau.
+const PAVE_PRICE = 8;
+const ROAD_W = 48;       // bề ngang đường (khoảng chiếm chỗ để kiểm tra vướng)
+const ROAD_REACH = 90;   // điểm lát mới phải cách đường cũ không quá chừng này
+const ROAD_LINK = 110;   // các điểm lát gần hơn chừng này thì vẽ nối liền
+// điểm (x, y) đã nằm trên đường (đường mòn hoặc đường đã lát)
+function onMainRoad(x, y) {
+  const pt = new DOMPoint(x, y);
+  return [...document.querySelectorAll('.paths .dirt')].some((p) => p.isPointInStroke(pt)) || $('.paths .plaza').isPointInFill(pt)
+    || [...document.querySelectorAll('.paths .pad')].some((p) => p.isPointInFill(pt));
+}
+// các điểm dọc tâm đường mòn chính, quảng trường & sân trước nhà (để nối đường lát vào)
+let mainPts = null;
+function mainRoadPoints() {
+  if (mainPts) return mainPts;
+  mainPts = [];
+  const main = $('.paths .dirt:not(#roadDirt)'), len = main.getTotalLength();
+  for (let l = 0; l <= len; l += 6) { const p = main.getPointAtLength(l); mainPts.push({ x: p.x, y: p.y }); }
+  for (let a = 0; a < 24; a++) mainPts.push({ x: 470 + Math.cos(a * Math.PI / 12) * 50, y: 390 + Math.sin(a * Math.PI / 12) * 50 });
+  document.querySelectorAll('.paths .pad').forEach((e) => {
+    const cx = +e.getAttribute('cx'), cy = +e.getAttribute('cy'), rx = +e.getAttribute('rx'), ry = +e.getAttribute('ry');
+    for (let a = 0; a < 24; a++) mainPts.push({ x: cx + Math.cos(a * Math.PI / 12) * rx * 0.75, y: cy + Math.sin(a * Math.PI / 12) * ry * 0.6 });
+  });
+  return mainPts;
+}
+const nearest = (pts, x, y) => pts.reduce((b, p) => { const d = Math.hypot(p.x - x, p.y - y); return d < b.d ? { p, d } : b; }, { p: null, d: Infinity });
+// điểm lát ở (x, y) có nối được với đường chính / đoạn đã lát không
+function roadConnected(x, y) {
+  return nearest(Object.values(state.roads), x, y).d < ROAD_REACH || nearest(mainRoadPoints(), x, y).d < ROAD_REACH;
+}
+// chỗ gốc cây rừng mở rộng chiếm (toạ độ khung 960)
+const outerFoot = (t) => ({ x: t.x - stageOX + t.w * 0.2, y: t.foot - stageOY - t.w * 0.6, w: t.w * 0.6, h: t.w * 0.6 });
+function tryPave(x, y) {
+  if (state.paving <= 0) return toast('🛤️ Hết đá lát đường — mua ở Cửa hàng (mục Mở rộng).', true);
+  if (onMainRoad(x, y) || nearest(Object.values(state.roads), x, y).d < 26) return toast('Chỗ này đã là đường rồi.');
+  if (inWater(x, y)) return toast('Không lát đường xuống ao được!');
+  const box = { x: x - ROAD_W / 2, y: y - 14, w: ROAD_W, h: 28 };
+  if (state.plots.some((p) => hit(cellRect(p.c, p.r), box))) return toast('Chỗ này là ruộng, không lát đường được.');
+  if ([...document.querySelectorAll('.building')].some((b) => hit(boxOf(b), box))) return toast('Vướng nhà rồi, lát chỗ khác nhé.');
+  const trees = [...document.querySelectorAll('#decor [data-tree]')].filter((el) => !el.hidden && hit(treeFoot(el), box));
+  const outer = forestTrees.filter((t) => t.s !== 'gone' && hit(outerFoot(t), box));
+  if (trees.some((el) => el.dataset.state !== 'stump') || outer.some((t) => t.s !== 'stump')) {
+    return toast('🌳 Có cây chắn đường — chặt cây trước rồi mới lát được.', true);
+  }
+  if (!roadConnected(x, y)) return toast('🛤️ Đường phải lát nối tiếp từ đường chính (hoặc từ đoạn đã lát) ra.', true);
+  lastHop = null;
+  const ids = trees.map((el) => el.dataset.tree).concat(outer.map((t) => t.id));
+  whenArrived(moveBunny(x, y - $('#bunny').offsetHeight + 6), () => layRoad(x, y, ids));
+}
+// stumpIds = gốc cây nằm dưới chỗ lát: đào luôn, cây mất hẳn
+function layRoad(x, y, stumpIds) {
+  if (state.paving <= 0 || !useEnergy(COST.pave)) return;
+  state.paving--;
+  stumpIds.forEach((id) => Object.assign(treeAt(id), { gone: true, down: 0, hits: 0 }));
+  state.roads['r' + Date.now()] = { x: Math.round(x), y: Math.round(y) };
+  addXp(1);
+  toast(`🛤️ Đã lát đường${stumpIds.length ? ' (đào luôn gốc cây)' : ''} — còn ${state.paving} đá lát`);
+  renderAll();
+}
+// đá cuội nhặt ở tảng đá: 3 viên đổi được 1 đá lát đường
+function craftPaving() {
+  if (count(state.produce, 'dacuoi') < 3) return;
+  take(state.produce, 'dacuoi', 3);
+  state.paving++;
+  toast(`🪨 Đã ghép 3 đá cuội thành 1 đá lát (có ${state.paving} đá lát)`);
+  renderAll();
+}
+function buyPaving(n) {
+  if (state.coins < PAVE_PRICE * n) return;
+  state.coins -= PAVE_PRICE * n;
+  state.paving += n;
+  toast(`🛒 Đã mua ${n} đá lát đường`);
+  renderAll();
+}
+// vẽ đường lát: mỗi điểm lát nối với các điểm lát gần nó và với đường chính gần nhất
+function renderRoads() {
+  const pts = Object.values(state.roads);
+  const key = pts.map((r) => r.x + ',' + r.y).join(';');
+  if (key === renderRoads.prev) return;
+  renderRoads.prev = key;
+  let d = '';
+  pts.forEach((r, i) => {
+    d += `M${r.x} ${r.y} l.1 0 `;
+    for (let k = i + 1; k < pts.length; k++) {
+      if (Math.hypot(pts[k].x - r.x, pts[k].y - r.y) < ROAD_LINK) d += `M${r.x} ${r.y} L${pts[k].x} ${pts[k].y} `;
+    }
+    const m = nearest(mainRoadPoints(), r.x, r.y);
+    if (m.d < ROAD_LINK) d += `M${r.x} ${r.y} L${m.p.x.toFixed(1)} ${m.p.y.toFixed(1)} `;
+  });
+  $('#roadEdge').setAttribute('d', d);
+  $('#roadDirt').setAttribute('d', d);
+}
 function buyAxe() {
   if (state.axe || state.coins < AXE_PRICE) return;
   state.coins -= AXE_PRICE;
@@ -835,9 +1018,62 @@ function renderWild() {
   const html = Object.entries(state.wild).map(([i, w]) => {
     const [x, y] = WILD_SPOTS[i];
     return `<button class="wild" data-wild="${i}" title="Nấm dại — bấm để hái (⚡${COST.pick})"
-      style="left:${x}px; top:${y}px; z-index:${20 + Math.round(y / 10)}">${wildShroomSVG(w.v)}</button>`;
+      style="left:${x}px; top:${y}px; z-index:${footZ(y + 26)}">${wildShroomSVG(w.v)}</button>`;
   }).join('');
   if (html !== renderWild.prev) { renderWild.prev = html; $('#wild').innerHTML = html; }
+}
+
+// ---------- Hái lượm ----------
+const forageFoot = (f) => f.y + f.w * artRatio(f.kind);   // y chân của món đồ
+// tìm 1 chỗ trống ngẫu nhiên cho món đồ mới mọc: không trên đường, ruộng, nhà, ao, gốc cây, đồ vật khác
+function freeSpot(kind) {
+  const w = FORAGE[kind].w, h = w * artRatio(kind);
+  const solid = [...document.querySelectorAll('.building')].map((el) => boxOf(el))
+    .concat([...document.querySelectorAll('#decor [data-tree]')].filter((el) => !el.hidden).map(treeFoot))
+    .concat([...document.querySelectorAll('#decor .decor:not([data-tree]):not([data-kind="pond"])')].map((el) => boxOf(el)))
+    .concat(state.plots.map((p) => { const b = cellRect(p.c, p.r); return { x: b.x - 8, y: b.y - 8, w: b.w + 16, h: b.h + 16 }; }));
+  for (let k = 0; k < 120; k++) {
+    const fx = 50 + Math.random() * 860, fy = 150 + Math.random() * 740;   // chân món đồ
+    const box = { x: fx - w / 2, y: fy - Math.min(h, 34), w, h: Math.min(h, 34) };
+    if (inPond(fx, fy) || inPond(fx, fy - h / 2) || onPath(box)) continue;
+    if (solid.some((b) => hit(b, box))) continue;
+    if (nearest(Object.values(state.roads), fx, fy).d < 45) continue;
+    if (state.forage.some((f) => Math.hypot(f.x + f.w / 2 - fx, forageFoot(f) - fy) < 40)) continue;
+    if (WILD_SPOTS.some(([x, y]) => Math.hypot(x + 15 - fx, y + 26 - fy) < 36)) continue;
+    return { x: Math.round(fx - w / 2), y: Math.round(fy - h), w };
+  }
+  return null;
+}
+function spawnForage(kind) {
+  const spot = freeSpot(kind);
+  if (!spot) return false;
+  state.forage.push({ id: 'g' + (++state.forageN), kind, ...spot, v: Math.floor(Math.random() * 4) });
+  return true;
+}
+function pickForage(id) {
+  const i = state.forage.findIndex((f) => f.id === id);
+  if (i < 0) return;
+  const f = state.forage[i], F = FORAGE[f.kind];
+  if (!useEnergy(F.cost || COST.pick)) return;
+  state.forage.splice(i, 1);
+  state.forageWait.push({ kind: f.kind, at: Date.now() + F.regrow });
+  if (F.wood) {
+    state.wood += F.wood;
+    toast(`🪵 Nhặt được ${F.wood} bó củi từ khúc gỗ mục`);
+  } else {
+    give(state.produce, F.give, F.n);
+    toast(`🧺 Hái được ${F.n} ${GOODS[F.give].name.toLowerCase()}`);
+  }
+  addXp(1);
+  renderAll();
+}
+function renderForage() {
+  const key = state.forage.map((f) => f.id).join();
+  if (key === renderForage.prev) return;
+  renderForage.prev = key;
+  $('#forage').innerHTML = state.forage.map((f) =>
+    `<button class="forage" data-forage="${f.id}" title="${FORAGE[f.kind].title} (⚡${FORAGE[f.kind].cost || COST.pick})"
+      style="left:${f.x}px; top:${f.y}px; width:${f.w}px; z-index:${footZ(forageFoot(f))}">${forageArt(f.kind, f.v)}</button>`).join('');
 }
 
 // ---------- Câu cá ----------
@@ -906,6 +1142,71 @@ function renderPond() {
       <div class="meta">Bán 🪙${CATCH[id].sell} · ⭐${CATCH[id].xp} · ${CATCH[id].snap >= 0.1 ? 'rất khỏe, dễ làm gãy cần' : CATCH[id].snap >= 0.07 ? 'khá khỏe' : 'hiền'}</div></div>`).join('');
 }
 
+// ---------- Ao sen ----------
+// thả ngó sen ở ô nước, sen nở thì hái; hái sen có thể gặp cá khổng lồ
+const lotusRipe = (p) => !!p.crop && p.growth >= CROPS[p.crop].days * DAY_MS;
+const isBig = () => !!(state.morph && state.morph.kind === 'big');
+
+function lotusAction(i) {
+  const p = state.lotus[i];
+  if (!p.crop) return openSeedPicker(i, true);
+  if (!lotusRipe(p)) {
+    const daysLeft = Math.ceil((CROPS[p.crop].days * DAY_MS - p.growth) / DAY_MS);
+    return toast(`🪷 Sen đang lớn — còn ${daysLeft} ngày nữa mới nở`);
+  }
+  harvestLotus(i);
+}
+
+function plantLotus(i, cropId) {
+  if (count(state.seeds, cropId) <= 0 || state.lotus[i].crop) return;
+  if (!useEnergy(COST.plant)) return;
+  take(state.seeds, cropId, 1);
+  state.lotus[i] = { crop: cropId, growth: 0 };
+  toast(`🪷 Đã thả ngó sen xuống ao`);
+  closeModal();
+  renderAll();
+}
+
+function harvestLotus(i) {
+  const p = state.lotus[i];
+  if (!lotusRipe(p) || !useEnergy(COST.harvest + 1)) return;
+  const c = CROPS[p.crop];
+  const big = isBig();
+  if (Math.random() < (big ? GIANT_FISH_RATE_BIG : GIANT_FISH_RATE)) {
+    // thỏ bình thường không chống nổi cá khổng lồ
+    if (!big) {
+      state.lotus[i] = emptyLotus();
+      return die('bị cá khổng lồ ngoi lên kéo xuống đáy ao lúc đang hái sen 🐟', 'fish');
+    }
+    give(state.produce, 'cakhonglo', 1);
+    addXp(CATCH.cakhonglo.xp);
+    toast('💪🐟 Cá khổng lồ ngoi lên đớp — nhưng thỏ khổng lồ đã đánh thắng và tóm gọn nó!', true);
+  }
+  give(state.produce, p.crop, c.yield);
+  addXp(c.xp);
+  state.lotus[i] = emptyLotus();
+  toast(`🪷 Hái được ${c.yield} ${c.name.toLowerCase()}`);
+  renderAll();
+}
+
+function renderLotus() {
+  const html = state.lotus.map((p, i) => {
+    const [x, y] = LOTUS_POS[i];
+    const ripe = lotusRipe(p);
+    const stage = !p.crop ? -1 : ripe ? 3 : Math.min(2, Math.floor((p.growth / (CROPS[p.crop].days * DAY_MS)) * 3));
+    const title = !p.crop ? 'Ô nước trống — bấm để thả ngó sen'
+      : ripe ? 'Sen đã nở! Bấm để hái (coi chừng cá khổng lồ)' : 'Sen đang lớn';
+    return `<button class="lotus grow ${ripe ? 'ripe' : ''}" data-lotus="${i}" title="${title}" style="left:${x}px; top:${y}px">
+      ${stage < 0 ? '<span class="lotus-empty">+</span>' : lotusSVG(stage)}</button>`;
+  }).join('');
+  // chỉ vẽ lại khi sen đổi giai đoạn (để hiệu ứng mọc chạy & không mất cú bấm)
+  if (html !== renderLotus.prev) {
+    renderLotus.prev = html;
+    $('#lotus').innerHTML = html;
+    document.querySelectorAll('#lotus svg').forEach(sketchStatic);
+  }
+}
+
 // ---------- Mua & đặt đất ----------
 // mua đất xong chọn ô lưới trống bất kỳ: không vướng nhà, đường, ao, đá, bụi quả, cây đang đứng hay ô đất khác
 let placing = false;
@@ -922,6 +1223,8 @@ function obstacles() {
   document.querySelectorAll('#decor :is([data-kind="boulder"], [data-kind="berry"], [data-kind="torch"], [data-kind="pond"],'
     + ' [data-kind="barrel"], [data-kind="crate"], [data-kind="woodpile"], [data-kind="log"])')
     .forEach((el) => out.push(boxOf(el, 4)));
+  // bụi quả, tảng đá, khúc gỗ… đang mọc trên bản đồ (hoa & cỏ nhỏ thì đặt đất đè lên được)
+  document.querySelectorAll('#forage .forage').forEach((el) => { if (el.offsetWidth > 30) out.push(boxOf(el, 4)); });
   return out;
 }
 function onPath(b) {
@@ -1085,7 +1388,8 @@ function waterAll() {
 
 // ---------- Xương cá & phân bón ----------
 // mỗi con cá (không tính tôm) trong món ăn để lại 1 xương
-const bonesOf = (ingr) => Object.entries(ingr).reduce((n, [id, k]) => n + (CATCH[id] && CATCH[id].art === 'fish' ? k : 0), 0);
+const bonesOf = (ingr) => Object.entries(ingr).reduce((n, [id, k]) =>
+  n + (!CATCH[id] ? 0 : CATCH[id].art === 'fish' ? k : CATCH[id].art === 'giantfish' ? 3 * k : 0), 0);
 function gainBones(n) {
   if (!n) return;
   give(state.produce, 'xuongca', n);
@@ -1189,7 +1493,7 @@ function renderGarden() {
     el.classList.toggle('has-bug', !!(p.crop && p.bug));
     el.classList.toggle('fert', !!(p.crop && p.fert && p.growth < CROPS[p.crop].days * DAY_MS));
     const bugEl = el.querySelector('.bug'), pest = p.pest || 'sau';
-    if (p.bug && bugEl.dataset.k !== pest) { bugEl.dataset.k = pest; bugEl.innerHTML = catchSVG(pest); }
+    if (p.bug && bugEl.dataset.k !== pest) { bugEl.dataset.k = pest; bugEl.innerHTML = catchSVG(pest); sketchStatic(bugEl.firstElementChild); }
     el.classList.toggle('dead', !!(p.crop && p.dead));
     el.classList.toggle('thirsty', !!(p.crop && !p.dead && !wet && (p.dryMs || 0) > DRY_DIE_MS * 0.4));
     if (!p.crop) {
@@ -1217,6 +1521,7 @@ function renderGarden() {
         plantEl.dataset.k = 'dead';
         plantEl.className = 'plant';
         plantEl.innerHTML = cropSVG(p.crop, Math.max(1, stage));
+        sketchStatic(plantEl.firstElementChild);
       }
       badge.textContent = '🍂';
       bar.style.display = 'none';
@@ -1228,6 +1533,7 @@ function renderGarden() {
       plantEl.dataset.k = key;
       plantEl.className = 'plant';
       plantEl.innerHTML = cropSVG(p.crop, stage);
+      sketchStatic(plantEl.firstElementChild);
       void plantEl.offsetWidth;
       plantEl.classList.add('grow');
     }
@@ -1246,9 +1552,13 @@ function renderGarden() {
 }
 
 // ---------- Chọn hạt giống ----------
-function openSeedPicker(i) {
+// water = true: đang chọn cho ô sen dưới ao (chỉ thả được ngó sen)
+let pickingLotus = false;
+function openSeedPicker(i, water = false) {
   selectedPlot = i;
-  const owned = Object.keys(CROPS).filter((id) => count(state.seeds, id) > 0);
+  pickingLotus = water;
+  const owned = Object.keys(CROPS).filter((id) => count(state.seeds, id) > 0 && !!CROPS[id].water === water);
+  $('#seedModal h3').textContent = water ? 'Chọn ngó sen để thả xuống ao' : 'Chọn hạt giống để gieo';
   $('#seedPick').innerHTML = owned.length
     ? owned.map((id) => {
         const c = CROPS[id];
@@ -1256,7 +1566,8 @@ function openSeedPicker(i) {
           <div class="meta">Có ${state.seeds[id]} hạt · 🕒 ${c.days} ngày · thu ${c.yield}</div>
           <div class="actions"><button class="btn sm" data-plant="${id}">Gieo (⚡${COST.plant})</button></div></div>`;
       }).join('')
-    : '<p class="empty-note">Hết hạt giống rồi! Ghé Cửa hàng để mua thêm nhé.</p>';
+    : `<p class="empty-note">${water ? 'Chưa có ngó sen giống! Mua "Hoa sen" ở Cửa hàng (từ cấp 2).'
+      : 'Hết hạt giống rồi! Ghé Cửa hàng để mua thêm nhé.'}</p>`;
   $('#seedModal').hidden = false;
 }
 function closeModal() { $('#seedModal').hidden = true; selectedPlot = null; }
@@ -1638,7 +1949,14 @@ function renderShop() {
     <div class="card"><div class="title"><span class="ico">🪵</span>Củi đốt lửa trại</div>
       <div class="meta">Mỗi bó +${WOOD_FUEL} lửa · đang có ${state.wood} bó</div>
       <div class="actions"><button class="btn sm" data-buywood="1" ${state.coins >= WOOD_PRICE ? '' : 'disabled'}>Mua 🪙${WOOD_PRICE}</button>
-        <button class="btn sm ghost" data-buywood="5" ${state.coins >= WOOD_PRICE * 5 ? '' : 'disabled'}>Mua 5</button></div></div>`;
+        <button class="btn sm ghost" data-buywood="5" ${state.coins >= WOOD_PRICE * 5 ? '' : 'disabled'}>Mua 5</button></div></div>
+    <div class="card"><div class="title"><span class="ico">🛤️</span>Đá lát đường</div>
+      <div class="meta"><b>Chuột phải</b> vào chỗ đất để lát 1 mảng đường, phải nối tiếp từ đường chính ra.
+        Cây chắn thì chặt trước, gốc cây sẽ được đào luôn. Đang có: ${state.paving} đá lát.</div>
+      <div class="actions"><button class="btn sm" data-buypave="1" ${state.coins >= PAVE_PRICE ? '' : 'disabled'}>Mua 🪙${PAVE_PRICE}</button>
+        <button class="btn sm ghost" data-buypave="5" ${state.coins >= PAVE_PRICE * 5 ? '' : 'disabled'}>Mua 5</button>
+        <button class="btn sm ghost" data-pavecraft="1" ${count(state.produce, 'dacuoi') >= 3 ? '' : 'disabled'}>
+          Đổi 3 đá cuội → 1 đá lát (có ${count(state.produce, 'dacuoi')})</button></div></div>`;
 }
 
 function buySeed(id, n) {
@@ -1786,6 +2104,7 @@ function chaseStep(dt) {
   b.classList.toggle('flip', dx < 0);
   b.style.left = bx + (dx / d) * step + 'px';
   b.style.top = by + (dy / d) * step - b.offsetHeight + 'px';
+  b.classList.toggle('swim', inWater(b.offsetLeft, b.offsetTop + b.offsetHeight));
 }
 function hitWolf() {
   if (!wolf || wolf.hits >= WOLF_HITS) return;
@@ -1924,6 +2243,8 @@ function renderHud() {
 function renderAll() {
   renderHud();
   renderTrees();
+  refreshForest(treeStateOf);
+  renderRoads();
   renderGarden();
   renderPlacer();
   $('#placeLand').hidden = !state.landPaid;
@@ -1941,7 +2262,9 @@ function renderAll() {
   renderMedicine();
   updateIllView();
   renderPond();
+  renderLotus();
   renderWild();
+  renderForage();
   renderInv();
   updateMorph();
   renderNight();
@@ -1956,10 +2279,13 @@ function tick() {
   updateIllView();
   renderHud();
   if (renderTrees()) renderPlacer();   // cây mọc lại thì chỗ đặt đất thay đổi
+  refreshForest(treeStateOf);
   if (fishing && Date.now() >= fishing.end) reelIn();
   renderNight();
   wolfTick();
   renderWild();
+  renderForage();
+  renderLotus();
   if (state.morph) updateMorph();
   renderGarden();
   renderStoves();
@@ -1992,6 +2318,23 @@ $('#wild').addEventListener('click', (e) => {
   const i = +el.dataset.wild;
   whenArrived(moveBunny(el.offsetLeft + 15, el.offsetTop + 26 - $('#bunny').offsetHeight), () => pickWild(i));
 });
+// bấm vào ô sen: thỏ lội xuống ao (bơi) tới chỗ đó rồi thả ngó sen / hái sen
+$('#lotus').addEventListener('click', (e) => {
+  const el = e.target.closest('[data-lotus]');
+  if (!el) return;
+  lastHop = null;
+  const i = +el.dataset.lotus;
+  const [x, y] = LOTUS_POS[i];
+  whenArrived(moveBunny(x + 30, y - $('#bunny').offsetHeight * 0.86 + 6), () => lotusAction(i));
+});
+// bấm vào bụi quả, hoa, cỏ, cây non, tảng đá, khúc gỗ: thỏ chạy tới hái
+$('#forage').addEventListener('click', (e) => {
+  const el = e.target.closest('[data-forage]');
+  if (!el) return;
+  lastHop = null;
+  const id = el.dataset.forage;
+  whenArrived(moveBunny(el.offsetLeft + el.offsetWidth / 2, el.offsetTop + el.offsetHeight - $('#bunny').offsetHeight), () => pickForage(id));
+});
 // bấm vào cây trên bản đồ để chặt
 $('#decor').addEventListener('click', (e) => {
   const el = e.target.closest('[data-tree]');
@@ -2003,26 +2346,43 @@ $('#placeLand').addEventListener('click', () => (placing ? stopPlacing() : start
 $('.world-viewport').addEventListener('click', (e) => {
   if (e.target.closest('.plot, .building, [data-tree], .slot, button')) return;
   const s = $('#stage').getBoundingClientRect();
-  const x = Math.min(930, Math.max(30, (e.clientX - s.left) / worldScale));
-  const y = Math.min(900, Math.max(60, (e.clientY - s.top) / worldScale));
+  // đi được khắp màn hình, kể cả vào rừng mở rộng hai bên
+  const rx = (e.clientX - s.left) / worldScale, ry = (e.clientY - s.top) / worldScale;
   lastHop = null;
+  // bấm trúng cây rừng mở rộng: thỏ ra gốc cây rồi chặt
+  const ft = outerTreeAt(rx, ry);
+  if (ft) {
+    const id = ft.id;
+    return whenArrived(moveBunny(ft.x + ft.w / 2 - stageOX, ft.foot - stageOY - $('#bunny').offsetHeight), () => chopOuter(id));
+  }
+  const x = Math.min(worldW - stageOX - 30, Math.max(30 - stageOX, rx));
+  const y = Math.min(worldH - stageOY - 20, Math.max(60 - stageOY, ry));
   moveBunny(x, y - $('#bunny').offsetHeight + 6);
+});
+// chuột phải xuống đất: lát 1 mảng đường ở chỗ đó (bấm cả lên gốc cây đã chặt được)
+$('.world-viewport').addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  if (state.dead || e.target.closest('.plot, .building, .slot, .lotus, .wild, .forage')) return;
+  const s = $('#stage').getBoundingClientRect();
+  tryPave((e.clientX - s.left) / worldScale, (e.clientY - s.top) / worldScale);
 });
 
 document.body.addEventListener('click', (e) => {
   const t = e.target.closest('[data-plant],[data-cook],[data-collect],[data-sell],[data-sellall],[data-eat],[data-selldish],[data-buy],[data-buy5],[data-up],'
     + '[data-add],[data-remove],[data-method],[data-customcook],[data-eatc],[data-sellc],[data-tossc],'
-    + '[data-wood],[data-buywood],[data-burn],[data-deliver],[data-skip],'
+    + '[data-wood],[data-buywood],[data-buypave],[data-pavecraft],[data-burn],[data-deliver],[data-skip],'
     + '[data-madd],[data-mremove],[data-mmethod],[data-mcook],[data-place],[data-cast],[data-bait],[data-makefert]');
   if (!t) return;
   const d = t.dataset;
-  if (d.plant) plant(selectedPlot, d.plant);
+  if (d.plant) (pickingLotus ? plantLotus : plant)(selectedPlot, d.plant);
   else if (d.makefert) makeFert();
   else if (d.cast) castLine();
   else if (d.bait) { bait = d.bait; renderPond(); }
   else if (d.place) placePlot(...d.place.split(',').map(Number));
   else if (d.wood) addWood();
   else if (d.buywood) buyWood(+d.buywood);
+  else if (d.buypave) buyPaving(+d.buypave);
+  else if (d.pavecraft) craftPaving();
   else if (d.burn) burnProduce(d.burn);
   else if (d.deliver) deliver(+d.deliver);
   else if (d.skip) skipOrder(+d.skip);
@@ -2133,6 +2493,7 @@ setInterval(wolfFrame, 16);
 $('#avatar').innerHTML = bunnySVG(false);
 $('#bunny').innerHTML = bunnySVG(false) + `<span class="hand-torch">${torchSVG()}</span>`;
 $('#chef').innerHTML = bunnySVG(true);
+document.querySelectorAll('#avatar svg, #bunny svg, #chef svg').forEach(sketchStatic);
 
 simulate(Date.now(), true);
 fillOrders();

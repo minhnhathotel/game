@@ -4,6 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vườn Thỏ Hồng</title>
+  <!-- cài thành app trên máy (Chrome/Edge) -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#3b3129">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -38,9 +43,13 @@
     <button class="tab" id="fertAll" aria-label="Bón phân cho các cây đang lớn" hidden>
       <span data-icon="fert"></span><b class="tab-n" id="fertN">0</b></button>
     <button class="tab" id="placeLand" aria-label="Đặt đất đã mua" hidden><span data-icon="land"></span></button>
+    <hr>
+    <button class="tab" id="installBtn" aria-label="Cài game thành app (có biểu tượng trên máy)"><span data-icon="install"></span></button>
+    <button class="tab" id="dlBtn" aria-label="Tải file game .html (chơi không cần mạng)"><span data-icon="download"></span></button>
   </nav>
   <div class="inv" id="inv"></div>
   <div id="speech"></div>
+  <div id="feed" aria-live="polite"></div>
 
   <div class="world-viewport">
     <div class="world" id="world">
@@ -52,22 +61,25 @@
         <ellipse class="pad" cx="470" cy="220" rx="112" ry="26"/>
         <ellipse class="pad" cx="812" cy="302" rx="92" ry="24"/>
         <ellipse class="pad" cx="835" cy="515" rx="56" ry="12"/>
-        <!-- đường mòn uốn lượn: bếp, kho, cửa hàng, cầu câu, ruộng -->
+        <!-- đường mòn uốn lượn: bếp, kho, cửa hàng, cầu câu -->
         <path class="edge" d="M470 390 C474 340 462 280 470 214
           M470 390 C400 398 330 382 262 392 C206 400 156 388 150 346 C147 326 148 312 146 299
           M470 390 C540 382 616 400 696 390 C752 382 816 398 830 356 C834 336 832 318 834 299
-          M470 390 C516 420 576 446 594 494 C606 540 598 600 620 656
-          M470 390 C420 408 360 418 330 440 C310 452 296 456 284 466"/>
+          M470 390 C516 420 576 446 594 494 C606 540 598 600 620 656"/>
+        <!-- đường người chơi tự lát (game.js vẽ), cùng kiểu với đường mòn nên nối liền vào nhau -->
+        <path class="edge" id="roadEdge" d=""/>
         <circle class="plaza-edge" cx="470" cy="390" r="66"/>
         <path class="dirt" d="M470 390 C474 340 462 280 470 214
           M470 390 C400 398 330 382 262 392 C206 400 156 388 150 346 C147 326 148 312 146 299
           M470 390 C540 382 616 400 696 390 C752 382 816 398 830 356 C834 336 832 318 834 299
-          M470 390 C516 420 576 446 594 494 C606 540 598 600 620 656
-          M470 390 C420 408 360 418 330 440 C310 452 296 456 284 466"/>
+          M470 390 C516 420 576 446 594 494 C606 540 598 600 620 656"/>
+        <path class="dirt" id="roadDirt" d=""/>
         <circle class="plaza" cx="470" cy="390" r="62"/>
       </svg>
       <div id="decor"></div>
       <div id="wild"></div>
+      <div id="forage"></div>
+      <div id="lotus"></div>
 
       <button class="building small" id="b-storage" data-open="storage" title="Nhà kho" style="left:60px; top:150px">
         <span class="bsvg"></span></button>
@@ -91,7 +103,10 @@
       </div>
       <div class="bunny" id="bunny"></div>
       </div>
+      <div id="forestFront"></div>
       <div class="night" id="night"></div>
+      <button class="wolf" id="wolf" aria-label="Sói! Bấm để đánh đuổi" hidden>
+        <span class="wolf-body"></span><span class="wolf-eye"></span></button>
     </div>
   </div>
 
@@ -188,6 +203,21 @@
         Hãy bắt đầu lại và nhớ nấu thuốc chữa bệnh kịp thời nhé.</p>
       <button class="btn ghost" id="deathBook">📖 Xem sổ</button>
       <button class="btn" id="reviveBtn">🌱 Chơi lại từ đầu</button>
+    </div>
+  </div>
+
+  <div class="modal" id="installHelp" hidden>
+    <div class="modal-box">
+      <h3>🖥️ Cài game thành app</h3>
+      <p>Cài xong sẽ có biểu tượng <b>Vườn Thỏ Hồng</b> trên màn hình nền &amp; menu Start, mở như phần mềm, mất mạng vẫn chơi được.</p>
+      <ol class="install-steps">
+        <li><b>Chrome / Cốc Cốc:</b> bấm biểu tượng <b>cài đặt ⊕</b> (màn hình có mũi tên) ở cuối thanh địa chỉ —
+          hoặc menu <b>⋮</b> → <b>Truyền, lưu và chia sẻ</b> → <b>Cài đặt trang dưới dạng ứng dụng</b>.</li>
+        <li><b>Edge:</b> menu <b>⋯</b> → <b>Ứng dụng</b> → <b>Cài đặt trang web này dưới dạng ứng dụng</b>.</li>
+        <li>Bấm <b>Cài đặt</b>. Muốn ghim xuống thanh tác vụ: chuột phải vào biểu tượng app → <b>Ghim vào thanh tác vụ</b>.</li>
+      </ol>
+      <p class="hint">Không thấy mục cài? Bấm <b>Ctrl + F5</b> để tải lại trang rồi thử lại. Nếu đã cài rồi thì mở app từ menu Start.</p>
+      <button class="btn ghost" id="closeInstall">Đóng</button>
     </div>
   </div>
 
