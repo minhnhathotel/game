@@ -335,7 +335,13 @@ function toast(msg, important = false) {
   el.textContent = msg;
   box.appendChild(el);
   while (box.children.length > (important ? 4 : 6)) box.firstChild.remove();
-  setTimeout(() => el.remove(), important ? 2600 : 4000);
+  // tin càng dài hiện càng lâu cho kịp đọc; nhiều tin liên tiếp thì tin sau ở lâu hơn tin trước ít nhất 1,5 giây
+  const now = Date.now();
+  let ms = Math.min(9000, Math.max(important ? 3000 : 4000, 1200 + msg.length * 60));
+  ms = Math.max(ms, (box.lastEnd || 0) - now + 1500);
+  box.lastEnd = now + ms;
+  el.style.animationDuration = ms + 'ms';
+  setTimeout(() => el.remove(), ms);
 }
 // lời thoại bám theo đầu thỏ; đồng thời xếp lớp thỏ với cây cối để thỏ đi được dưới tán cây
 let lastDepth = null;
